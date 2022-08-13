@@ -1,0 +1,10 @@
+gym==0.23.0
+highway-env==1.5
+imageio==2.19.3
+matplotlib==3.5.1
+numpy==1.23.1
+tensorflow==2.9.2
+tensorflow-probability==0.17.0
+tf-agents==0.13.0
+tqdm==4.64.0
+wandb==0.13.1
