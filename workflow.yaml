@@ -1,28 +1,28 @@
 jobs:
   CloneRepo:
     resources:
-      instance-type: Free-CPU
+      instance-type: C4
     outputs:
       repo:
         type: volume
     uses: git-checkout@v1
     with:
         url: https://github.com/Fabio-Klinge/DreamerV2-final_project-DRL.git
-  StyleGan2:
+  DreamerV2:
     resources:
-      instance-type: Free-A4000
+      instance-type: C4
     needs:
       - CloneRepo
     inputs:
       repo: CloneRepo.outputs.repo
     outputs:
-      generatedFaces:
-        type: dataset
-        with:
-          ref: dsdcsm298xv95ex
+        model:
+            type: volume
     uses: script@v1
     with:
       script: |-
+        cd /inputs/repo
         pip install -r requirements.txt
-        python main.py generate-images
-      image: tensorflow/tensorflow:1.14.0-gpu-py3
+        wandb login fe6d76dd59b168f3c38dc3200555a6f9b3169b73
+        python main.py
+      image: tensorflow/tensorflow:latest-gpu
