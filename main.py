@@ -44,23 +44,23 @@ for episode in range(epochs):
             # TODO ÄNDERN
             hidden_state_h_and_stochastic_state_z = tf.reshape(hidden_state_h_and_stochastic_state_z, (-1, stochastic_state_size + hidden_unit_size))
 
-            decoder_logits = world_model.decoder(hidden_state_h_and_stochastic_state_z)
+            decoder_logits = world_model.decoder(hidden_state_h_and_stochastic_state_z[:-1])
 
             # TODO ÄNDERN
             decoder_logits = tf.reshape(decoder_logits, (-1, image_shape[0], image_shape[1], image_shape[2]))
 
             decoder_distribution = tfp.distributions.Independent(tfp.distributions.Normal(decoder_logits, 1), reinterpreted_batch_ndims=3)
-            reward_logits = world_model.reward_model(hidden_state_h_and_stochastic_state_z)
+            reward_logits = world_model.reward_model(hidden_state_h_and_stochastic_state_z[:-1])
             reward_distribution = tfp.distributions.Independent(tfp.distributions.Normal(reward_logits, 1), reinterpreted_batch_ndims=1)
-            discount_logits = world_model.discount_model(hidden_state_h_and_stochastic_state_z)
+            discount_logits = world_model.discount_model(hidden_state_h_and_stochastic_state_z[:-1])
             discount_distribution = tfp.distributions.Independent(tfp.distributions.Bernoulli(logits=discount_logits), reinterpreted_batch_ndims=1)
 
-            image_log_loss = world_model.compute_log_loss(decoder_distribution, state)
-            reward_log_loss = world_model.compute_log_loss(reward_distribution, reward)
-            discount_log_loss = world_model.compute_log_loss(discount_distribution, non_terminal)
+            image_log_loss = world_model.compute_log_loss(decoder_distribution, state[:-1])
+            reward_log_loss = world_model.compute_log_loss(reward_distribution, reward[1:])
+            discount_log_loss = world_model.compute_log_loss(discount_distribution, non_terminal[1:])
             kl_loss = world_model.compute_kl_loss(prior_rssm_states, posterior_rssm_states)
 
-            loss = 0.1 * image_log_loss + reward_log_loss + discount_log_loss + 5.0 * kl_loss
+            loss = image_log_loss + reward_log_loss + 5.0 * discount_log_loss + 0.1 * kl_loss
 
         predicted_state = wandb.Image((decoder_distribution.sample(1)[0][0] + 1) * 128)
         real_state = wandb.Image((state[0] + 1) * 128)

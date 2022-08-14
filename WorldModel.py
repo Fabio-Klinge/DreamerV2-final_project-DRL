@@ -35,7 +35,7 @@ class WorldModel:
         x = Conv2D(64, (3, 3), activation="elu", padding="same")(x)  # 64 / 48x12
         x = MaxPooling2D((2, 2), padding="same")(x)  # 64 / 48x12
         x = GlobalAveragePooling2D()(x)  # 64
-        encoder_output = Dense(output_size, activation="elu")(x)
+        encoder_output = Dense(output_size, activation="linear")(x)
 
         encoder = tf.keras.Model(encoder_input, encoder_output, name="Encoder")
 
@@ -57,7 +57,7 @@ class WorldModel:
         # tf.debugging.assert_equal(x)
         x = Conv2DTranspose(16, (3, 3), strides=2, activation="elu", padding="same")(x)
         #x = BatchNormalization()(x)
-        x = Conv2DTranspose(1, (3, 3), strides=2, activation="tanh", padding="same")(x)
+        x = Conv2DTranspose(1, (3, 3), strides=2, activation="linear", padding="same")(x)
         # x = Conv2DTranspose(1, (3, 3), strides=2, activation="elu", padding="same")(x)
         x = Flatten()(x)
         # Might needs shape as Tensor  #event_shape=output_size
@@ -260,6 +260,7 @@ class WorldModel:
         prior: Z
         posterior: Z^
         """
+        # TODO Do we need Straight Through Gradients here?
         prior_distribution = tfp.distributions.Independent(tfp.distributions.OneHotCategorical(logits=prior_rssm_states.logits), reinterpreted_batch_ndims=1)
         posterior_distribution = tfp.distributions.Independent(tfp.distributions.OneHotCategorical(logits=posterior_rssm_states.logits), reinterpreted_batch_ndims=1)
 

@@ -78,7 +78,7 @@ class RSSM:
             input_size: tuple=(hidden_unit_size,),
             output_size: int=hidden_unit_size
     ):
-        return RNN(GRUCell(output_size))
+        return GRUCell(output_size)
 
         rnn_input = tf.keras.Input(shape=input_size)
         # rnn_hidden_state_placeholder = tf.keras.Input(shape=(hidden_unit_size,))
@@ -160,11 +160,11 @@ class RSSM:
 
         # TODO Remove Squeeze
         # Create h from GRU with old h (t-1) and the embedding
-        state_action_embedding = tf.reshape(state_action_embedding, shape=(-1, 200, 1))
+        state_action_embedding = tf.reshape(state_action_embedding, shape=(-1, hidden_unit_size))
         # TODO ÄNDERN
         # previous_rssm_state.hidden_rnn_state = tf.reshape(previous_rssm_state.hidden_rnn_state, shape=(-1, 200))
-
-        hidden_rnn_state = self.rnn(state_action_embedding, previous_rssm_state.hidden_rnn_state * non_terminal)
+        # TODO Which is the correct output? First or last?
+        hidden_rnn_state, _ = self.rnn(state_action_embedding, tf.reshape(previous_rssm_state.hidden_rnn_state * non_terminal, (-1, hidden_unit_size)))
 
         # Logits created from h (with MLP) to create Z^
         prior_logits = self.prior_model(hidden_rnn_state)
