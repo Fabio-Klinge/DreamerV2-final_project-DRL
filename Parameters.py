@@ -18,7 +18,7 @@ mlp_hidden_layer_size = 100
 batch_size = 50
 sequence_length = 50
 
-epochs = 64
+epochs = 1024
 
 env_config = {
     "observation": {

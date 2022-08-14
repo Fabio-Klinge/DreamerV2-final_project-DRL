@@ -56,8 +56,8 @@ class WorldModel:
         # TODO Check whether correct reshape happens
         # tf.debugging.assert_equal(x)
         x = Conv2DTranspose(16, (3, 3), strides=2, activation="elu", padding="same")(x)
-        x = BatchNormalization()(x)
-        x = Conv2DTranspose(1, (3, 3), strides=2, activation="linear", padding="same")(x)
+        #x = BatchNormalization()(x)
+        x = Conv2DTranspose(1, (3, 3), strides=2, activation="tanh", padding="same")(x)
         # x = Conv2DTranspose(1, (3, 3), strides=2, activation="elu", padding="same")(x)
         x = Flatten()(x)
         # Might needs shape as Tensor  #event_shape=output_size
