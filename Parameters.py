@@ -18,8 +18,8 @@ discount_factor = 0.995
 
 #
 mlp_hidden_layer_size = 100
-batch_size = 50
-sequence_length = 50
+batch_size = 2
+sequence_length = 25
 
 epochs = 2048
 target_update_every = 5

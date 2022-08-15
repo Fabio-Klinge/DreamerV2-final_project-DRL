@@ -22,8 +22,8 @@ wandb.tensorflow.log(tf.summary)
 
 
 for episode in range(epochs):
-    environment_interactor.create_trajectories(200)
-    data = buffer.sample(batch_size=50, prefetch_size=10)
+    environment_interactor.create_trajectories(batch_size*sequence_length)
+    data = buffer.sample(batch_size=batch_size, prefetch_size=10)
 
 
     trainer.train_batch(data, world_model)

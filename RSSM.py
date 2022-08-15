@@ -6,32 +6,33 @@ from typing import NamedTuple
 
 from Parameters import *
 
+
 class RSSMState(NamedTuple):
     logits: tf.Tensor = tf.zeros(shape=(stochastic_state_size,))
     stochastic_state_z: tf.Tensor = tf.zeros(shape=(stochastic_state_size,))
-    hidden_rnn_state: tf.Tensor = tf.zeros(shape=(hidden_unit_size,))
+    hidden_rnn_state_h: tf.Tensor = tf.zeros(shape=(hidden_unit_size,))
 
     @classmethod
     def from_list(cls, rssm_states):
-        logits = tf.stack([rssm_state.logits for rssm_state in rssm_states])
-        stochastic_state_z = tf.stack([rssm_state.stochastic_state_z for rssm_state in rssm_states])
-        hidden_rnn_state = tf.stack([rssm_state.hidden_rnn_state for rssm_state in rssm_states])
+        logits = tf.stack([rssm_state.logits for rssm_state in rssm_states], axis=1)
+        stochastic_state_z = tf.stack([rssm_state.stochastic_state_z for rssm_state in rssm_states], axis=1)
+        hidden_rnn_state = tf.stack([rssm_state.hidden_rnn_state_h for rssm_state in rssm_states], axis=1)
 
         return cls(logits, stochastic_state_z, hidden_rnn_state)
 
     def get_hidden_state_h_and_stochastic_state_z(self):
-        hidden_state_h_and_stochastic_state_z = tf.concat([self.stochastic_state_z, self.hidden_rnn_state], axis=-1)
+        hidden_state_h_and_stochastic_state_z = tf.concat([self.stochastic_state_z, self.hidden_rnn_state_h], axis=-1)
         return hidden_state_h_and_stochastic_state_z
 
     @classmethod
     def detach(cls, rssm_state):
-        return cls(tf.stop_gradient(rssm_state.logits), tf.stop_gradient(rssm_state.stochastic_state_z), tf.stop_gradient(rssm_state.hidden_rnn_state))
+        return cls(tf.stop_gradient(rssm_state.logits), tf.stop_gradient(rssm_state.stochastic_state_z), tf.stop_gradient(rssm_state.hidden_rnn_state_h))
 
     @classmethod
     def convert_sequences_to_batches(cls, rssm_state, sequence_length):
         logits = cls.convert_sequence_to_batch(rssm_state.logits[:sequence_length])
         stochastic_state_z = cls.convert_sequence_to_batch(rssm_state.stochastic_state_z[:sequence_length])
-        hidden_rnn_state = cls.convert_sequence_to_batch(rssm_state.hidden_rnn_state[:sequence_length])
+        hidden_rnn_state = cls.convert_sequence_to_batch(rssm_state.hidden_rnn_state_h[:sequence_length])
 
         return cls(logits, stochastic_state_z, hidden_rnn_state)
 
@@ -58,8 +59,8 @@ class RSSM:
 
     def create_stochastic_state_action_embedder(
             self,
-            input_size: tuple=(stochastic_state_size + action_size,),
-            output_size: int=hidden_unit_size
+            input_size: tuple = (stochastic_state_size + action_size,),
+            output_size: int = hidden_unit_size
     ):
         state_action_input = tf.keras.Input(shape=input_size)
         state_action_output = Dense(output_size, activation="elu")(state_action_input)
@@ -75,8 +76,8 @@ class RSSM:
     # Contains GRU cell
     def create_rnn(
             self,
-            input_size: tuple=(hidden_unit_size,),
-            output_size: int=hidden_unit_size
+            input_size: tuple = (hidden_unit_size,),
+            output_size: int = hidden_unit_size
     ):
         return GRUCell(output_size)
 
@@ -95,8 +96,8 @@ class RSSM:
     # Z^ in paper
     def create_prior_stochastic_state_embedder(
             self,
-            input_size: tuple=hidden_unit_size,
-            output_size: int=stochastic_state_size
+            input_size: tuple = hidden_unit_size,
+            output_size: int = stochastic_state_size
     ):
         state_embedder_input = tf.keras.Input(shape=input_size)
         x = Dense(mlp_hidden_layer_size, activation="elu")(state_embedder_input)
@@ -115,8 +116,8 @@ class RSSM:
     # Input size = concatenated output of RNN with output of CNN
     def create_posterior_stochastic_state_embedder(
             self,
-            input_size: tuple=hidden_unit_size + hidden_unit_size,
-            output_size: int=stochastic_state_size
+            input_size: tuple = hidden_unit_size + hidden_unit_size,
+            output_size: int = stochastic_state_size
     ):
         state_embedder_input = tf.keras.Input(shape=input_size)
         x = Dense(mlp_hidden_layer_size, activation="elu")(state_embedder_input)
@@ -149,7 +150,7 @@ class RSSM:
 
         return tf.reshape(sample, (-1, *stochastic_state_shape))
 
-    def dream(self, previous_rssm_state: RSSMState, previous_action: tf.Tensor, non_terminal: tf.Tensor=tf.constant(1.0)):
+    def dream(self, previous_rssm_state: RSSMState, previous_action: tf.Tensor, non_terminal: tf.Tensor = tf.constant(1.0)):
         """
         Creates Z^
         """
@@ -164,7 +165,7 @@ class RSSM:
         # TODO ÄNDERN
         # previous_rssm_state.hidden_rnn_state = tf.reshape(previous_rssm_state.hidden_rnn_state, shape=(-1, 200))
         # TODO Which is the correct output? First or last?
-        _, hidden_rnn_state = self.rnn(state_action_embedding, tf.reshape(previous_rssm_state.hidden_rnn_state * non_terminal, (-1, hidden_unit_size)))
+        _, hidden_rnn_state = self.rnn(state_action_embedding, tf.reshape(previous_rssm_state.hidden_rnn_state_h * non_terminal, (-1, hidden_unit_size)))
 
         # Logits created from h (with MLP) to create Z^
         prior_logits = self.prior_model(hidden_rnn_state)
@@ -209,14 +210,14 @@ class RSSM:
         prior_rssm_state = self.dream(previous_rssm_state, previous_action, previous_non_terminal)
 
         # concatenates h and the output of our CNN (encoded input frame X)
-        encoded_state_and_hidden_state = tf.concat([prior_rssm_state.hidden_rnn_state, encoded_state], axis=-1)
+        encoded_state_and_hidden_state = tf.concat([prior_rssm_state.hidden_rnn_state_h, encoded_state], axis=-1)
 
         # Logits created from concat of h and encoded frame X (with MLP) to create Z
         posterior_logits = self.posterior_model(encoded_state_and_hidden_state)
         # Create Z
         posterior_stochastic_state_z = self.sample_stochastic_state(posterior_logits)
         # Saves logits for Z, Z, and h
-        posterior_rssm_state = RSSMState(posterior_logits, tf.reshape(posterior_stochastic_state_z, (-1, stochastic_state_size)), prior_rssm_state.hidden_rnn_state)
+        posterior_rssm_state = RSSMState(posterior_logits, tf.reshape(posterior_stochastic_state_z, (-1, stochastic_state_size)), prior_rssm_state.hidden_rnn_state_h)
 
         return prior_rssm_state, posterior_rssm_state
 
@@ -224,11 +225,9 @@ class RSSM:
         prior_rssm_states = []
         posterior_rssm_states = []
 
-        for encoded_state, action, non_terminal in zip(encoded_states, actions, non_terminals):
-            # TODO remove islandsolution
-            # encoded_state = tf.expand_dims(encoded_state, axis=0)
-            # action = tf.expand_dims(action, axis=0)
-            # non_terminal = tf.expand_dims(non_terminal, axis=0)
+        for sequence_index in range(sequence_length):
+            encoded_state, action, non_terminal = encoded_states[:, sequence_index], actions[:, sequence_index], non_terminals[:, sequence_index]
+
             # ?? 0 if terminal state is reached
             previous_action = action * non_terminal
             # Z^, Z

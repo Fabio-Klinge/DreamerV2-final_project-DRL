@@ -165,6 +165,9 @@ class WorldModel:
         batched_posterior_rssm_states = RSSMState.detach(RSSMState.convert_sequences_to_batches(posterior_rssm_state, sequence_length=sequence_length - 1))
 
         dreamed_rssm_states, dreamed_log_probabilities, dreamed_policy_entropies = self.rssm.dreaming_rollout(horizon, self.actor, batched_posterior_rssm_states)
+        dreamed_log_probabilities = tf.reshape(dreamed_log_probabilities, [horizon, batch_size * sequence_length])
+        dreamed_policy_entropies = tf.reshape(dreamed_policy_entropies, [horizon, batch_size * sequence_length])
+
 
         dreamed_hidden_state_h_and_stochastic_state_z = dreamed_rssm_states.get_hidden_state_h_and_stochastic_state_z()
 
@@ -193,16 +196,16 @@ class WorldModel:
         return actor_loss, critic_loss
 
     def actor_loss(self, dreamed_reward, dreamed_value, dreamed_discount, dreamed_log_probabilities, dreamed_policy_entropies, actor_entropy_scale=0.001, lmbda=0.95):
-        dreamed_reward = tf.reshape(dreamed_reward, (horizon, batch_size - 1, -1))
-        dreamed_value = tf.reshape(dreamed_value, (horizon, batch_size - 1, -1))
-        dreamed_discount = tf.reshape(dreamed_discount, (horizon, batch_size - 1, -1))
+        dreamed_reward = tf.reshape(dreamed_reward, (horizon, -1))
+        dreamed_value = tf.reshape(dreamed_value, (horizon, -1))
+        dreamed_discount = tf.reshape(dreamed_discount, (horizon, -1))
 
         lambda_returns = self.compute_return(dreamed_reward[:-1], dreamed_value[:-1], dreamed_discount[:-1], bootstrap=dreamed_value[-1], lmbda=lmbda)
-        advantage = tf.squeeze(tf.stop_gradient(lambda_returns - dreamed_value[:-1]), axis=-1)
+        advantage = tf.stop_gradient(lambda_returns - dreamed_value[:-1])
         objective = dreamed_log_probabilities[1:] * advantage
 
         discounts = tf.concat([tf.ones_like(dreamed_discount[:1]), dreamed_discount[1:]], 0)
-        discount = tf.squeeze(tf.math.cumprod(discounts[:-1], 0), -1)
+        discount = tf.math.cumprod(discounts[:-1], 0)
         policy_entropy = dreamed_policy_entropies[1:]
         actor_loss = -tf.math.reduce_sum(tf.math.reduce_mean(discount * (objective + actor_entropy_scale * policy_entropy), axis=1))  # TODO correct axis?
         return actor_loss, discount, lambda_returns
@@ -210,12 +213,12 @@ class WorldModel:
     def critic_loss(self, dreamed_hidden_state_h_and_stochastic_state_z, discount, lambda_returns):
         # TODO dreamed_hidden_state_h_and_stochastic_state_z[:-1]
         # TODO Workaround
-        dreamed_hidden_state_h_and_stochastic_state_z = tf.reshape(dreamed_hidden_state_h_and_stochastic_state_z, (horizon, batch_size - 1, -1))
+        dreamed_hidden_state_h_and_stochastic_state_z = tf.reshape(dreamed_hidden_state_h_and_stochastic_state_z, (horizon, batch_size * sequence_length, -1))
         critic_logits = self.critic(tf.stop_gradient(tf.reshape(dreamed_hidden_state_h_and_stochastic_state_z[:-1], (-1, hidden_unit_size + stochastic_state_size))))
         # TODO Workaround
-        critic_logits = tf.reshape(critic_logits, (horizon - 1, batch_size - 1, -1))
+        critic_logits = tf.reshape(critic_logits, (horizon - 1, batch_size * sequence_length))
         critic_distribution = tfp.distributions.Independent(tfp.distributions.Normal(critic_logits, 1))
-        critic_loss = -tf.reduce_mean(tf.stop_gradient(discount) * tf.expand_dims(critic_distribution.log_prob(tf.stop_gradient(lambda_returns)), -1))
+        critic_loss = -tf.reduce_mean(tf.stop_gradient(tf.reshape(discount, (horizon - 1, -1))) * tf.expand_dims(critic_distribution.log_prob(tf.stop_gradient(lambda_returns)), -1))
 
         return critic_loss
 

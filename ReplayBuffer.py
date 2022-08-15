@@ -2,6 +2,7 @@
 import tensorflow as tf
 # Buffer
 from tf_agents.replay_buffers import tf_uniform_replay_buffer
+from Parameters import *
 
 class Buffer:
 
@@ -51,6 +52,11 @@ class Buffer:
                 # Either 0 or 1
                 dtype=tf.dtypes.float32,
                 name="Non-Terminal State"
+            ),
+            tf.TensorSpec(
+                shape=[1, ],
+                dtype=tf.dtypes.float32,
+                name="Index"
             )
         )
 
@@ -80,11 +86,11 @@ class Buffer:
         self.buffer.add_batch(batched_values)
 
     def sample(self, batch_size, prefetch_size):
-        data = self.buffer.as_dataset(single_deterministic_pass=True)
+        data = self.buffer.as_dataset(num_steps=sequence_length, single_deterministic_pass=True)
 
         # normalize inputs from 0/255 to -1/1
-        data = data.map(lambda buffer_content, _: (((buffer_content[0] / 128.) - 1, (buffer_content[1] / 128.) - 1, buffer_content[2], buffer_content[3], buffer_content[4]), _))
+        data = data.map(lambda buffer_content, _: (((buffer_content[0] / 128.) - 1, (buffer_content[1] / 128.) - 1, buffer_content[2], buffer_content[3], buffer_content[4], buffer_content[5]), _))
         data = data.cache()
-        data = data.batch(batch_size).prefetch(prefetch_size)
+        data = data.batch(batch_size).prefetch(prefetch_size) # TODO .batch(batch_size, drop_remainder=True)
         # later we want these to be sequences (Do we though)
         return data
