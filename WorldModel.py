@@ -10,15 +10,15 @@ class WorldModel:
     def __init__(self) -> None:
         super().__init__()
 
-        self.encoder = self.create_encoder()
-        self.decoder = self.create_decoder()
-        self.reward_model = self.create_reward_predictor()
-        self.discount_model = self.create_discount_predictor()
-        self.actor = self.create_actor()
-        self.critic = self.create_critic()
-        self.target_critic = tf.keras.models.clone_model(self.critic)
+        self.encoder: tf.keras.Model = self.create_encoder()
+        self.decoder: tf.keras.Model = self.create_decoder()
+        self.reward_model: tf.keras.Model = self.create_reward_predictor()
+        self.discount_model: tf.keras.Model = self.create_discount_predictor()
+        self.actor: tf.keras.Model = self.create_actor()
+        self.critic: tf.keras.Model = self.create_critic()
+        self.target_critic: tf.keras.Model = tf.keras.models.clone_model(self.critic)
 
-        self.rssm = RSSM()
+        self.rssm: RSSM = RSSM()
 
         self.models = (self.encoder,
                        self.decoder,
@@ -124,7 +124,7 @@ class WorldModel:
     def create_actor(
             self,
             input_size: tuple=hidden_unit_size + stochastic_state_size,
-            output_size: int=action_size
+            output_size: int=action_space_size
     ):
         actor_input = tf.keras.Input(shape=input_size)
         x = Dense(mlp_hidden_layer_size, activation="elu")(actor_input)

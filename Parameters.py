@@ -1,3 +1,5 @@
+import tensorflow as tf
+
 # Image size
 image_shape = (128,32, 1)
 
@@ -10,6 +12,7 @@ stochastic_state_size = stochastic_state_shape[0] * stochastic_state_shape[1]
 
 #
 action_size = 1
+action_space_size = 5
 horizon = 15
 discount_factor = 0.995
 
@@ -18,7 +21,12 @@ mlp_hidden_layer_size = 100
 batch_size = 50
 sequence_length = 50
 
-epochs = 1024
+epochs = 2048
+target_update_every = 5
+
+optimizer_world_model = tf.keras.optimizers.Adam(0.0002, clipnorm=100.0)
+optimizer_actor = tf.keras.optimizers.Adam(4e-5, clipnorm=100.0)
+optimizer_critic = tf.keras.optimizers.Adam(1e-4, clipnorm=100.0)
 
 env_config = {
     "observation": {

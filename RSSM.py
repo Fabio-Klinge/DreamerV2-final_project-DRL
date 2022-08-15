@@ -46,10 +46,10 @@ class RSSM:
     def __init__(self) -> None:
         super().__init__()
 
-        self.state_action_embedder = self.create_stochastic_state_action_embedder()
-        self.rnn = self.create_rnn()
-        self.prior_model = self.create_prior_stochastic_state_embedder()
-        self.posterior_model = self.create_posterior_stochastic_state_embedder()
+        self.state_action_embedder: tf.keras.Model = self.create_stochastic_state_action_embedder()
+        self.rnn: tf.keras.layers.Layer = self.create_rnn()
+        self.prior_model: tf.keras.Model = self.create_prior_stochastic_state_embedder()
+        self.posterior_model: tf.keras.Model = self.create_posterior_stochastic_state_embedder()
 
         self.models = (self.state_action_embedder,
                        self.rnn,
@@ -164,7 +164,7 @@ class RSSM:
         # TODO ÄNDERN
         # previous_rssm_state.hidden_rnn_state = tf.reshape(previous_rssm_state.hidden_rnn_state, shape=(-1, 200))
         # TODO Which is the correct output? First or last?
-        hidden_rnn_state, _ = self.rnn(state_action_embedding, tf.reshape(previous_rssm_state.hidden_rnn_state * non_terminal, (-1, hidden_unit_size)))
+        _, hidden_rnn_state = self.rnn(state_action_embedding, tf.reshape(previous_rssm_state.hidden_rnn_state * non_terminal, (-1, hidden_unit_size)))
 
         # Logits created from h (with MLP) to create Z^
         prior_logits = self.prior_model(hidden_rnn_state)
@@ -183,22 +183,23 @@ class RSSM:
 
         next_rssm_states = []
         action_entropies = []
-        image_log_probabilities = []
+        dream_log_probabilities = []
         for timestep in range(horizon):
             action_logits = actor(tf.stop_gradient(rssm_state.get_hidden_state_h_and_stochastic_state_z()))
-            action_distribution = tfp.distributions.Independent(tfp.distributions.Normal(action_logits, 1), reinterpreted_batch_ndims=1)
+            action_distribution = tfp.distributions.OneHotCategorical(logits=action_logits)
             action = action_distribution.sample()
-            rssm_state = self.dream(rssm_state, action)
+
+            rssm_state = self.dream(rssm_state, tf.expand_dims(tf.cast(tf.argmax(action, axis=-1), tf.float32), -1))
             next_rssm_states.append(rssm_state)
             # TODO is this correct? only entropy of action?
             action_entropies.append(action_distribution.entropy())
-            image_log_probabilities.append(action_distribution.log_prob(tf.round(tf.stop_gradient(action))))
+            dream_log_probabilities.append(action_distribution.log_prob(tf.round(tf.stop_gradient(action))))
 
         next_rssm_states = RSSMState.from_list(next_rssm_states)
-        image_log_probabilities = tf.stack(image_log_probabilities, 0)
+        dream_log_probabilities = tf.stack(dream_log_probabilities, 0)
         action_entropies = tf.stack(action_entropies, 0)
 
-        return next_rssm_states, image_log_probabilities, action_entropies
+        return next_rssm_states, dream_log_probabilities, action_entropies
 
     def observe(self, encoded_state: tf.Tensor, previous_action: tf.Tensor, previous_non_terminal: tf.Tensor, previous_rssm_state: RSSMState):
         """
@@ -225,9 +226,9 @@ class RSSM:
 
         for encoded_state, action, non_terminal in zip(encoded_states, actions, non_terminals):
             # TODO remove islandsolution
-            encoded_state = tf.expand_dims(encoded_state, axis=0)
-            action = tf.expand_dims(action, axis=0)
-            non_terminal = tf.expand_dims(non_terminal, axis=0)
+            # encoded_state = tf.expand_dims(encoded_state, axis=0)
+            # action = tf.expand_dims(action, axis=0)
+            # non_terminal = tf.expand_dims(non_terminal, axis=0)
             # ?? 0 if terminal state is reached
             previous_action = action * non_terminal
             # Z^, Z
