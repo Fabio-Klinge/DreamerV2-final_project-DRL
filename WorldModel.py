@@ -165,8 +165,8 @@ class WorldModel:
         batched_posterior_rssm_states = RSSMState.detach(RSSMState.convert_sequences_to_batches(posterior_rssm_state, sequence_length=sequence_length - 1))
 
         dreamed_rssm_states, dreamed_log_probabilities, dreamed_policy_entropies = self.rssm.dreaming_rollout(horizon, self.actor, batched_posterior_rssm_states)
-        dreamed_log_probabilities = tf.reshape(dreamed_log_probabilities, [horizon, batch_size * sequence_length])
-        dreamed_policy_entropies = tf.reshape(dreamed_policy_entropies, [horizon, batch_size * sequence_length])
+        dreamed_log_probabilities = tf.reshape(dreamed_log_probabilities, [horizon, batch_size * (sequence_length - 1)])
+        dreamed_policy_entropies = tf.reshape(dreamed_policy_entropies, [horizon, batch_size * (sequence_length - 1) ])
 
 
         dreamed_hidden_state_h_and_stochastic_state_z = dreamed_rssm_states.get_hidden_state_h_and_stochastic_state_z()
@@ -213,10 +213,10 @@ class WorldModel:
     def critic_loss(self, dreamed_hidden_state_h_and_stochastic_state_z, discount, lambda_returns):
         # TODO dreamed_hidden_state_h_and_stochastic_state_z[:-1]
         # TODO Workaround
-        dreamed_hidden_state_h_and_stochastic_state_z = tf.reshape(dreamed_hidden_state_h_and_stochastic_state_z, (horizon, batch_size * sequence_length, -1))
+        dreamed_hidden_state_h_and_stochastic_state_z = tf.reshape(dreamed_hidden_state_h_and_stochastic_state_z, (horizon, batch_size * (sequence_length - 1), -1))
         critic_logits = self.critic(tf.stop_gradient(tf.reshape(dreamed_hidden_state_h_and_stochastic_state_z[:-1], (-1, hidden_unit_size + stochastic_state_size))))
         # TODO Workaround
-        critic_logits = tf.reshape(critic_logits, (horizon - 1, batch_size * sequence_length))
+        critic_logits = tf.reshape(critic_logits, (horizon - 1, batch_size * (sequence_length - 1)))
         critic_distribution = tfp.distributions.Independent(tfp.distributions.Normal(critic_logits, 1))
         critic_loss = -tf.reduce_mean(tf.stop_gradient(tf.reshape(discount, (horizon - 1, -1))) * tf.expand_dims(critic_distribution.log_prob(tf.stop_gradient(lambda_returns)), -1))
 
