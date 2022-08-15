@@ -9,7 +9,7 @@ class Buffer:
     def __init__(
             self,
             batch_size: int=1,
-            buffer_length: int=1000,
+            buffer_length: int=10000,
             observation_size: tuple=(128, 32, 1),
             action_size: int=1
     ):
