@@ -66,7 +66,7 @@ You can change the most important settings and hyperparameters in the Parameters
 <!-- ACKNOWLEDGMENTS -->
 ## Acknowledgments
 
-Extensively used resources besides Original-Papers:
+Extensively used resources besides Original DreamerV2 Paper:
 
 https://github.com/RajGhugare19/dreamerv2/
 
