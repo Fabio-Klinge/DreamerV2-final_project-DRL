@@ -41,7 +41,7 @@ Otherwise you need to create a [wandb account](https://wandb.ai/site) and get yo
 
 Alternatively you can use the provided Jupyter Notebooks main_*_colab.ipynb to instantly start using our project, without any hassle.
 
-Feel also free to use this Online Colab Version: [Colab Link]()
+Feel also free to use this Online Colab Version: [Colab Link](https://colab.research.google.com/drive/186zBcHhCsQSmZ_rir8bGqb-2GWukIzMC?usp=sharing)
 
 
 <p align="right">(<a href="#top">back to top</a>)</p>
