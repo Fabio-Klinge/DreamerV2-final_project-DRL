@@ -1,3 +1,5 @@
+import sys
+
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -23,18 +25,21 @@ class Agent:
 
         self.world_model: WorldModel = world_model
 
-    def create_trajectories(self, iterations):
+    def create_trajectories(self, steps = sys.maxsize, episodes = 0):
 
         state = self.env.reset()
         previous_action = self.env.action_space.sample()
         done = False
         previous_rssm_state = RSSMState()
+        episode = 0
+        scores = [[]]
 
-        for step in range(iterations):
+        for step in range(steps):
 
             action, posterior_rssm_state = self.act(state, previous_action, done, previous_rssm_state)
 
             next_state, reward, done, _ = self.env.step(action.numpy().item())
+            scores[episode].append(reward)
 
             self.buffer.add((
                 self.preprocess_data(action, done, next_state, reward, state, step)
@@ -50,6 +55,12 @@ class Agent:
                 done = False
                 previous_rssm_state = RSSMState()
 
+                episode += 1
+                if episodes != 0 and episode >= episodes:
+                    break
+                scores.append([])
+
+        return scores
     def preprocess_data(self, action, done, next_state, reward, state, step):
         return self.preprocess_state(state), \
                self.preprocess_next_state(next_state), \

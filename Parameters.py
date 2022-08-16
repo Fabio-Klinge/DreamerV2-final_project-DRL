@@ -18,11 +18,14 @@ discount_factor = 0.995
 
 #
 mlp_hidden_layer_size = 100
-batch_size = 50
-sequence_length = 50
+batch_size = 10
+prefetch_size = 10
+sequence_length = 20
 
 epochs = 2048
 target_update_every = 5
+save_models_every = 10
+continue_training_from_latest_checkpoint = True
 
 optimizer_world_model = tf.keras.optimizers.Adam(0.0002, clipnorm=100.0)
 optimizer_actor = tf.keras.optimizers.Adam(4e-5, clipnorm=100.0)

@@ -85,7 +85,7 @@ class Buffer:
         # Add to batch
         self.buffer.add_batch(batched_values)
 
-    def sample(self, batch_size, prefetch_size):
+    def sample(self):
         data = self.buffer.as_dataset(num_steps=sequence_length, single_deterministic_pass=True)
 
         # normalize inputs from 0/255 to -1/1

@@ -19,9 +19,8 @@ class Trainer:
 
         combined_trainable_variables = reduce(add, [model.trainable_variables for model in (world_model.models + world_model.rssm.models)])
 
-        # batch_of_sequences = dataset.window(55, shift=1)
-
         for batches_of_sequences, _ in dataset:
+            # TODO SWAPPED STATE AND NEXTSTATE
             state, next_state, action, reward, non_terminal, step_index = batches_of_sequences
 
 
@@ -35,7 +34,7 @@ class Trainer:
                 decoder_logits = world_model.decoder(hidden_state_h_and_stochastic_state_z)
 
                 # TODO ÄNDERN
-                decoder_logits = tf.reshape(decoder_logits, (-1, image_shape[0], image_shape[1], image_shape[2]))
+                # decoder_logits = tf.reshape(decoder_logits, (-1, image_shape[0], image_shape[1], image_shape[2]))
 
                 decoder_distribution = tfp.distributions.Independent(tfp.distributions.Normal(decoder_logits, 1), reinterpreted_batch_ndims=3)
                 reward_logits = world_model.reward_model(hidden_state_h_and_stochastic_state_z)
@@ -72,3 +71,5 @@ class Trainer:
 
             optimizer_actor.apply_gradients(zip(gradients_actor, world_model.actor.trainable_variables))
             optimizer_critic.apply_gradients(zip(gradients_critic, world_model.critic.trainable_variables))
+
+

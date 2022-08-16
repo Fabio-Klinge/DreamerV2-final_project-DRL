@@ -141,7 +141,7 @@ class RSSM:
         # Logit Outputs from MLP
         logits = tf.reshape(logits, shape=(-1, *stochastic_state_shape))
         # OneHot distribution over logits
-        logits_distribution = tfp.distributions.OneHotCategorical(logits)
+        logits_distribution = tfp.distributions.OneHotCategorical(logits=logits)
         # Sample from OneHot distribution
         sample = tf.cast(logits_distribution.sample(), tf.float32)
         # TODO observe logits_distribution.prob(sample) after few iterations
@@ -157,6 +157,7 @@ class RSSM:
         # TODO ÄNDERN
         stochastic_state_z = tf.reshape(previous_rssm_state.stochastic_state_z, (-1, stochastic_state_size))
         # Embedding of concatenation prior z and action (t-1)
+        # TODO Does it work as intended?
         state_action_embedding = self.state_action_embedder(tf.concat([stochastic_state_z * non_terminal, previous_action], axis=-1))
 
         # TODO Remove Squeeze
