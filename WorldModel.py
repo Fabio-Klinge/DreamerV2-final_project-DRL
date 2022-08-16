@@ -5,6 +5,7 @@ import tensorflow_probability as tfp
 from RSSM import RSSM, RSSMState
 from Parameters import *
 
+
 class WorldModel:
 
     def __init__(self) -> None:
@@ -25,7 +26,7 @@ class WorldModel:
                        self.reward_model,
                        self.discount_model)
 
-    def create_encoder(self, input_size: tuple=image_shape, output_size: int=hidden_unit_size):
+    def create_encoder(self, input_size: tuple = image_shape, output_size: int = hidden_unit_size):
         # Third dimension might be obsolete
         encoder_input = tf.keras.Input(shape=input_size)
         x = Conv2D(16, (3, 3), activation="elu", padding="same")(encoder_input)  # 16 layers of filtered 192x48 features
@@ -45,8 +46,8 @@ class WorldModel:
     # Output size = game frame
     def create_decoder(
             self,
-            input_size: tuple=stochastic_state_size + hidden_unit_size,
-            output_size: tuple=image_shape
+            input_size: tuple = stochastic_state_size + hidden_unit_size,
+            output_size: tuple = image_shape
     ):
         # Third dimension might be obsolete
         decoder_input = tf.keras.Input(shape=input_size)
@@ -56,7 +57,7 @@ class WorldModel:
         # TODO Check whether correct reshape happens
         # tf.debugging.assert_equal(x)
         x = Conv2DTranspose(16, (3, 3), strides=2, activation="elu", padding="same")(x)
-        #x = BatchNormalization()(x)
+        # x = BatchNormalization()(x)
         x = Conv2DTranspose(1, (3, 3), strides=2, activation="linear", padding="same")(x)
 
         # x = Flatten()(x)
@@ -76,8 +77,8 @@ class WorldModel:
     # Output: float predicting the obtained reward
     def create_reward_predictor(
             self,
-            input_size: tuple=hidden_unit_size + stochastic_state_size,
-            output_size: int=1
+            input_size: tuple = hidden_unit_size + stochastic_state_size,
+            output_size: int = 1
     ):
         reward_predictor_input = tf.keras.Input(shape=input_size)
         x = Dense(mlp_hidden_layer_size, activation="elu")(reward_predictor_input)
@@ -101,8 +102,8 @@ class WorldModel:
     # Output: float predicting the obtained reward
     def create_discount_predictor(
             self,
-            input_size: tuple=hidden_unit_size + stochastic_state_size,
-            output_size: int=1
+            input_size: tuple = hidden_unit_size + stochastic_state_size,
+            output_size: int = 1
     ):
         discount_predictor_input = tf.keras.Input(shape=input_size)
         x = Dense(mlp_hidden_layer_size, activation="elu")(discount_predictor_input)
@@ -122,8 +123,8 @@ class WorldModel:
 
     def create_actor(
             self,
-            input_size: tuple=hidden_unit_size + stochastic_state_size,
-            output_size: int=action_space_size
+            input_size: tuple = hidden_unit_size + stochastic_state_size,
+            output_size: int = action_space_size
     ):
         actor_input = tf.keras.Input(shape=input_size)
         x = Dense(mlp_hidden_layer_size, activation="elu")(actor_input)
@@ -141,8 +142,8 @@ class WorldModel:
 
     def create_critic(
             self,
-            input_size: tuple=hidden_unit_size + stochastic_state_size,
-            output_size: int=1
+            input_size: tuple = hidden_unit_size + stochastic_state_size,
+            output_size: int = 1
     ):
         critic_input = tf.keras.Input(shape=input_size)
         x = Dense(mlp_hidden_layer_size, activation="elu")(critic_input)
@@ -165,9 +166,8 @@ class WorldModel:
 
         dreamed_rssm_states, dreamed_log_probabilities, dreamed_policy_entropies = self.rssm.dreaming_rollout(horizon, self.actor, batched_posterior_rssm_states)
         # TODO Why we need sometimes -1 and sometimes not?!!??!?!?!
-        dreamed_log_probabilities = tf.reshape(dreamed_log_probabilities, [horizon, -1]) # batch_size * (sequence_length - 1)])
-        dreamed_policy_entropies = tf.reshape(dreamed_policy_entropies, [horizon, -1]) #batch_size * (sequence_length - 1) ])
-
+        dreamed_log_probabilities = tf.reshape(dreamed_log_probabilities, [horizon, -1])  # batch_size * (sequence_length - 1)])
+        dreamed_policy_entropies = tf.reshape(dreamed_policy_entropies, [horizon, -1])  # batch_size * (sequence_length - 1) ])
 
         dreamed_hidden_state_h_and_stochastic_state_z = dreamed_rssm_states.get_hidden_state_h_and_stochastic_state_z()
 
@@ -212,10 +212,10 @@ class WorldModel:
 
     def critic_loss(self, dreamed_hidden_state_h_and_stochastic_state_z, discount, lambda_returns):
         # TODO Why do we need sometimes -1 and sometimes not?!!??!?!?!
-        dreamed_hidden_state_h_and_stochastic_state_z = tf.reshape(dreamed_hidden_state_h_and_stochastic_state_z, (horizon, -1, hidden_unit_size + stochastic_state_size)) # batch_size * (sequence_length - 1), -1))
+        dreamed_hidden_state_h_and_stochastic_state_z = tf.reshape(dreamed_hidden_state_h_and_stochastic_state_z, (horizon, -1, hidden_unit_size + stochastic_state_size))  # batch_size * (sequence_length - 1), -1))
         critic_logits = self.critic(tf.stop_gradient(tf.reshape(dreamed_hidden_state_h_and_stochastic_state_z[:-1], (-1, hidden_unit_size + stochastic_state_size))))
         # TODO Why do we need sometimes -1 and sometimes not?!!??!?!?!
-        critic_logits = tf.reshape(critic_logits, (horizon - 1, -1)) # batch_size * (sequence_length - 1)))
+        critic_logits = tf.reshape(critic_logits, (horizon - 1, -1))  # batch_size * (sequence_length - 1)))
         critic_distribution = tfp.distributions.Independent(tfp.distributions.Normal(critic_logits, 1))
         critic_loss = -tf.reduce_mean(tf.stop_gradient(tf.reshape(discount, (horizon - 1, -1))) * tf.expand_dims(critic_distribution.log_prob(tf.stop_gradient(lambda_returns)), -1))
 
@@ -271,6 +271,4 @@ class WorldModel:
         # Loss with KL Balancing
         # TODO check reihenfolge, reduce_mean hat Gradients?!!?
         return alpha * tf.math.reduce_mean(tfp.distributions.kl_divergence(posterior_distribution_detached, prior_distribution)) + (
-                    1 - alpha) * tf.math.reduce_mean(tfp.distributions.kl_divergence(posterior_distribution, prior_distribution_detached))
-
-
+                1 - alpha) * tf.math.reduce_mean(tfp.distributions.kl_divergence(posterior_distribution, prior_distribution_detached))

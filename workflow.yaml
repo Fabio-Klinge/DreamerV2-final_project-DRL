@@ -7,7 +7,7 @@ jobs:
         type: volume
     uses: git-checkout@v1
     with:
-        url: https://github.com/Fabio-Klinge/DreamerV2-final_project-DRL.git
+      url: https://github.com/Fabio-Klinge/DreamerV2-final_project-DRL.git
   DreamerV2:
     resources:
       instance-type: C4
@@ -16,8 +16,8 @@ jobs:
     inputs:
       repo: CloneRepo.outputs.repo
     outputs:
-        model:
-            type: volume
+      model:
+        type: volume
     uses: script@v1
     with:
       script: |-

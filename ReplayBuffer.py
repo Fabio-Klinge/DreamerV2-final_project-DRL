@@ -4,14 +4,15 @@ import tensorflow as tf
 from tf_agents.replay_buffers import tf_uniform_replay_buffer
 from Parameters import *
 
+
 class Buffer:
 
     def __init__(
             self,
-            batch_size: int=1,
-            buffer_length: int=10000,
-            observation_size: tuple=(128, 32, 1),
-            action_size: int=1
+            batch_size: int = 1,
+            buffer_length: int = 10000,
+            observation_size: tuple = (128, 32, 1),
+            action_size: int = 1
     ):
         """
         Create replay buffer
@@ -91,6 +92,6 @@ class Buffer:
         # normalize inputs from 0/255 to -1/1
         data = data.map(lambda buffer_content, _: (((buffer_content[0] / 128.) - 1, (buffer_content[1] / 128.) - 1, buffer_content[2], buffer_content[3], buffer_content[4], buffer_content[5]), _))
         data = data.cache()
-        data = data.batch(batch_size, drop_remainder=True).prefetch(prefetch_size) # TODO .batch(batch_size, drop_remainder=True)
+        data = data.batch(batch_size, drop_remainder=True).prefetch(prefetch_size)  # TODO .batch(batch_size, drop_remainder=True)
         # later we want these to be sequences (Do we though)
         return data

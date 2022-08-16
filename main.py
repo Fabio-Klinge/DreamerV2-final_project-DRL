@@ -2,7 +2,9 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 import tf_agents
 
+import numpy as np
 import wandb
+
 wandb.init(settings=wandb.Settings(_disable_stats=True), sync_tensorboard=True)
 
 from RSSM import RSSM, RSSMState
@@ -11,7 +13,6 @@ from ReplayBuffer import Buffer
 from Agent import Agent
 from Trainer import Trainer
 from Parameters import *
-
 
 buffer = Buffer()
 world_model = WorldModel()
@@ -68,7 +69,7 @@ for episode in range(epochs):
     scores = environment_interactor.create_trajectories(steps=batch_size * sequence_length * 2)
     data = buffer.sample()
 
-     = trainer.train_batch(data, world_model)
+    trainer.train_batch(data, world_model)
 
     checkpointing()
 
@@ -84,8 +85,6 @@ for episode in range(epochs):
         tf_agents.utils.common.soft_variables_update(world_model.critic.variables, world_model.target_critic.variables, tau=1.0)
 
         log_model_weights_wandb()
-
-
 
     # Rewards
     # Checkpointing

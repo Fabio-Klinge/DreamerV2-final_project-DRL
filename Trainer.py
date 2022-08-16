@@ -12,30 +12,26 @@ from ReplayBuffer import Buffer
 from Agent import Agent
 from Parameters import *
 
+
 class Trainer:
     def __init__(self):
         super(Trainer, self).__init__()
-    def train_batch(self, dataset: tf.data.Dataset, world_model):
 
+    def train_batch(self, dataset: tf.data.Dataset, world_model):
         combined_trainable_variables = reduce(add, [model.trainable_variables for model in (world_model.models + world_model.rssm.models)])
 
         for batches_of_sequences, _ in dataset:
             # TODO SWAPPED STATE AND NEXTSTATE
             state, next_state, action, reward, non_terminal, step_index = batches_of_sequences
 
-
             with tf.GradientTape() as tape:
-                encoded_state = tf.reshape(world_model.encoder(tf.reshape(state,(-1, *image_shape))), (batch_size, sequence_length, -1))
+                encoded_state = tf.reshape(world_model.encoder(tf.reshape(state, (-1, *image_shape))), (batch_size, sequence_length, -1))
                 initial_rssm_state = RSSMState()
                 prior_rssm_states, posterior_rssm_states = world_model.rssm.observing_rollout(encoded_state, action, non_terminal, initial_rssm_state)
                 hidden_state_h_and_stochastic_state_z = posterior_rssm_states.get_hidden_state_h_and_stochastic_state_z()
                 hidden_state_h_and_stochastic_state_z = tf.reshape(hidden_state_h_and_stochastic_state_z[:, :-1], (-1, stochastic_state_size + hidden_unit_size))
 
                 decoder_logits = world_model.decoder(hidden_state_h_and_stochastic_state_z)
-
-                # TODO ÄNDERN
-                # decoder_logits = tf.reshape(decoder_logits, (-1, image_shape[0], image_shape[1], image_shape[2]))
-
                 decoder_distribution = tfp.distributions.Independent(tfp.distributions.Normal(decoder_logits, 1), reinterpreted_batch_ndims=3)
                 reward_logits = world_model.reward_model(hidden_state_h_and_stochastic_state_z)
                 reward_distribution = tfp.distributions.Independent(tfp.distributions.Normal(reward_logits, 1), reinterpreted_batch_ndims=1)
@@ -71,5 +67,3 @@ class Trainer:
 
             optimizer_actor.apply_gradients(zip(gradients_actor, world_model.actor.trainable_variables))
             optimizer_critic.apply_gradients(zip(gradients_critic, world_model.critic.trainable_variables))
-
-

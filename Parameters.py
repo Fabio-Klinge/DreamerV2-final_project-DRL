@@ -1,13 +1,13 @@
 import tensorflow as tf
 
 # Image size
-image_shape = (128,32, 1)
+image_shape = (128, 32, 1)
 
 # Long term memory of GRU
 hidden_unit_size = 200
 
 # Z in paper
-stochastic_state_shape = (32,32)
+stochastic_state_shape = (32, 32)
 stochastic_state_size = stochastic_state_shape[0] * stochastic_state_shape[1]
 
 #
@@ -45,5 +45,3 @@ env_config = {
 }
 
 # TODO different variable names for network inp/outp sizes
-
-
