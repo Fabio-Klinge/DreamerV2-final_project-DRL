@@ -4,7 +4,7 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-![Neural Style Transfer Example](images/paris_art.png)
+![DreamerV2 Example of Dreamed Atari Games](images/paris_art.png)
 
 This project is part of the _'Deep Reinforcement Learning'_ course at the _University Osnabrück_.  
  ( [Link to the DreamerV2 Paper](https://arxiv.org/pdf/2010.02193.pdf) )
