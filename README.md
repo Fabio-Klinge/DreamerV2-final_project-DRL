@@ -14,7 +14,7 @@ This is an example of the original [DreamerV2 repository](https://github.com/dan
 ![DreamerV2 Example of Dreamed Atari Games](images/DreamerV2_Dreaming.gif)
 
 
-It uses an One Hot Categorical Vector as Embedding State.
+DreamerV2 uses a world model, specifically a RSSM. First of all there is an autoencoder incorporated, which tries to encode and decode the input image. Between those are a couple more basic MLP/Embedding layer. A primary part is the GRUCell(purple) which is used to dream into the future, while incorporating information of the previous hidden states. It uses a One Hot Categorical Vector as Embedding State. This Embedding State + the Hidden State of the GRUCell is used as input to the decoder the image. There are two operating modes of the world model: Observing and Dreaming. Observing is just using collected real sequences and trains on it. Dreaming means starting from a real sequence state and dreaming into the future by generating embedding states from previous actions and hidden states of the GRUCell.
 ![DreamerV2 World Model Architecture](images/WorldModel.png)
 
 DreamerV2 uses an A2C Agent to learn on the generated images or so-called "dreams" of the world model. Its interactions with the world model is layed out in the following image. Basically it uses the hidden state h (purple) of the world model and the previous action (red) to predict the next action (red), and also the next reward and done(terminal state boolean).
