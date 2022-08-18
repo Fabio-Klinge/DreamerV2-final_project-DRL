@@ -23,6 +23,6 @@ jobs:
       script: |-
         cd /inputs/repo
         pip install -r requirements.txt
-        wandb login fe6d76dd59b168f3c38dc3200555a6f9b3169b73
+        wandb login $WANDB_API_KEY
         python main.py
       image: tensorflow/tensorflow:latest-gpu
