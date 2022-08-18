@@ -3,9 +3,6 @@ import tensorflow_probability as tfp
 import tf_agents
 
 import numpy as np
-import wandb
-
-wandb.init(settings=wandb.Settings(_disable_stats=True), sync_tensorboard=True)
 
 from RSSM import RSSM, RSSMState
 from WorldModel import WorldModel
@@ -13,6 +10,9 @@ from ReplayBuffer import Buffer
 from Agent import Agent
 from Trainer import Trainer
 from Parameters import *
+
+import wandb
+wandb.init(settings=wandb.Settings(_disable_stats=True), sync_tensorboard=True, mode="online" if use_wandb else "disabled")
 
 buffer = Buffer()
 world_model = WorldModel()
@@ -61,8 +61,8 @@ def log_model_weights_wandb():
         for layer in model.layers:
             if isinstance(layer, tf.keras.layers.Conv2D) or isinstance(layer, tf.keras.layers.Dense) or isinstance(layer, tf.keras.layers.Conv2DTranspose):
                 # print(layer.get_weights()[0].shape)
-                wandb.log({f"weights {model.name}": wandb.Histogram(layer.get_weights()[0])})
-                wandb.run.summary.update({f"weights {model.name}": wandb.Histogram(layer.get_weights()[0])})
+                wandb.log({f"weights {model.name}": layer.get_weights()[0]})
+                wandb.run.summary.update({f"weights {model.name}": layer.get_weights()[0]})
 
 
 for episode in range(epochs):
@@ -84,7 +84,6 @@ for episode in range(epochs):
     if episode % target_update_every == 0:
         tf_agents.utils.common.soft_variables_update(world_model.critic.variables, world_model.target_critic.variables, tau=1.0)
 
-        log_model_weights_wandb()
+        if logging_weights:
+            log_model_weights_wandb()
 
-    # Rewards
-    # Checkpointing

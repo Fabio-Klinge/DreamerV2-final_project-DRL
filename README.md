@@ -25,8 +25,6 @@ DreamerV2 uses an A2C Agent to learn on the generated images or so-called "dream
 
 <!-- Project Structure -->
 ## Project Structure
-
-
     .
     ├── images 
     ├── src                    
@@ -82,7 +80,7 @@ Feel also free to use this Online Colab Version: [Colab Link](https://colab.rese
 
 <!-- USAGE EXAMPLES -->
 ### Usage
-Run `main.py` while being in the Repository (as Working Directory).
+Run `main.py` while being in the `src` folder (as Working Directory).
 
 You can change the most important settings and hyperparameters in the Parameters.py.
 
@@ -96,17 +94,20 @@ You can change the most important settings and hyperparameters in the Parameters
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
-
 <!-- ACKNOWLEDGMENTS -->
 ## Acknowledgments
 
-Extensively used resources besides Original DreamerV2 Paper:
+Extensively used resources besides DreamerV2 Paper:
 
+**Original Implemntation of DreamerV2**: \
 https://github.com/RajGhugare19/dreamerv2/
 
+**Highway Environment**: \
+https://github.com/eleurent/highway-env
 
-Tools:
+### Tools:
 
+**Weights & Biases**: \
 https://wandb.ai/site
 
 <p align="right">(<a href="#top">back to top</a>)</p>

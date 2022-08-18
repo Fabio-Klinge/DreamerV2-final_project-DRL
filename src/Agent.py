@@ -51,9 +51,12 @@ class Agent:
         for step in range(steps):
 
             # Obtain action and embedded environment state
-            action, posterior_rssm_state = self.act(state, previous_action, done, previous_rssm_state)
+            # action, posterior_rssm_state = self.act(state, previous_action, done, previous_rssm_state)
+            # next_state, reward, done, _ = self.env.step(action.numpy().item())
 
-            next_state, reward, done, _ = self.env.step(action.numpy().item())
+            action = self.env.action_space.sample()
+            next_state, reward, done, _ = self.env.step(action)
+
             scores[episode].append(reward)
 
             self.buffer.add((
@@ -63,7 +66,7 @@ class Agent:
             # Update for next iteration
             state = next_state
             previous_action = action
-            previous_rssm_state = posterior_rssm_state
+            # previous_rssm_state = posterior_rssm_state
 
             # Terminal state
             if done:
@@ -133,11 +136,11 @@ class Agent:
         non_terminal = tf.expand_dims(self.preprocess_done(non_terminal), 0)
 
         # Create latent space vector of state with encoder
-        embed = self.world_model.encoder(state, training=False)
+        encoded_state = self.world_model.encoder(state, training=False)
         # Obtain object containing logits from posterior state z
-        _, posterior_rssm_state = self.world_model.rssm.observe(embed, previous_action, non_terminal, previous_rssm_state)
+        _, posterior_rssm_state = self.world_model.rssm.observe(encoded_state, previous_action, non_terminal, previous_rssm_state)
         # Obtain logits from posterior state z
-        hidden_state_h_and_stochastic_state_z = posterior_rssm_state.get_hidden_state_h_and_stochastic_state_z()
+        hidden_state_h_and_stochastic_state_z = posterior_rssm_state.get_stochastic_state_z_and_hidden_state_h()
 
         # Create distribution over actions and sample from it
         action_logits = self.world_model.actor(hidden_state_h_and_stochastic_state_z)

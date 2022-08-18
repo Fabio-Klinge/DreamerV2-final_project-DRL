@@ -20,9 +20,9 @@ class RSSMState(NamedTuple):
 
         return cls(logits, stochastic_state_z, hidden_rnn_state)
 
-    def get_hidden_state_h_and_stochastic_state_z(self):
-        hidden_state_h_and_stochastic_state_z = tf.concat([self.stochastic_state_z, self.hidden_rnn_state_h], axis=-1)
-        return hidden_state_h_and_stochastic_state_z
+    def get_stochastic_state_z_and_hidden_state_h(self):
+        stochastic_state_z_and_hidden_state_h = tf.concat([self.stochastic_state_z, self.hidden_rnn_state_h], axis=-1)
+        return stochastic_state_z_and_hidden_state_h
 
     @classmethod
     def detach(cls, rssm_state):
@@ -132,6 +132,7 @@ class RSSM:
         '''
         state_embedder_input = tf.keras.Input(shape=input_size)
         x = Dense(mlp_hidden_layer_size, activation="elu")(state_embedder_input)
+        x = Dense(output_size, activation="elu")(x)
         # Activation function removed
         state_embedder_output = Dense(output_size)(x)
 
@@ -145,7 +146,7 @@ class RSSM:
 
     def create_posterior_stochastic_state_embedder(
             self,
-            input_size: tuple = hidden_unit_size + hidden_unit_size,
+            input_size: tuple = encoding_size + hidden_unit_size,
             output_size: int = stochastic_state_size
     ):
         '''
@@ -160,7 +161,7 @@ class RSSM:
         '''
         state_embedder_input = tf.keras.Input(shape=input_size)
         x = Dense(mlp_hidden_layer_size, activation="elu")(state_embedder_input)
-        # Activation function removed
+        x = Dense(output_size, activation="elu")(x)
         state_embedder_output = Dense(output_size)(x)
 
         create_posterior_stochastic_state_embedder = tf.keras.Model(
@@ -183,11 +184,16 @@ class RSSM:
 
         # Logit Outputs from MLP
         logits = tf.reshape(logits, shape=(-1, *stochastic_state_shape))
+
+        sample = OneHotDist(logits=logits, dtype=tf.float32).sample()
+
+        return tf.reshape(sample, (-1, *stochastic_state_shape))
+
+
         # OneHot distribution over logits
         logits_distribution = tfp.distributions.OneHotCategorical(logits=logits)
         # Sample from OneHot distribution
         sample = tf.cast(logits_distribution.sample(), tf.float32)
-        # TODO observe logits_distribution.prob(sample) after few iterations
         # TODO Remove tf.expand_dims - shouldn't be necessary
         sample = sample + tf.expand_dims(logits_distribution.prob(sample) - tf.stop_gradient(logits_distribution.prob(sample)), -1)
 
@@ -205,15 +211,13 @@ class RSSM:
         '''
         # TODO ÄNDERN
         stochastic_state_z = tf.reshape(previous_rssm_state.stochastic_state_z, (-1, stochastic_state_size))
-        # Embedding of concatenation prior z and action (t-1)
-        # TODO Does it work as intended?
+        # Embedding of concatenation prior z and action (t-1) # TODO stochastic_state_z in wrong form ?! non_terminal: 50,1 vs 50,1024
         state_action_embedding = self.state_action_embedder(tf.concat([stochastic_state_z * non_terminal, previous_action], axis=-1))
 
-        # TODO Remove Squeeze
         # Create h from GRU with old h (t-1) and the embedding
         state_action_embedding = tf.reshape(state_action_embedding, shape=(-1, hidden_unit_size))
-        # TODO ÄNDERN
         # previous_rssm_state.hidden_rnn_state = tf.reshape(previous_rssm_state.hidden_rnn_state, shape=(-1, 200))
+
         # TODO Which is the correct output? First or last?
         _, hidden_rnn_state = self.rnn(state_action_embedding, tf.reshape(previous_rssm_state.hidden_rnn_state_h * non_terminal, (-1, hidden_unit_size)))
 
@@ -242,14 +246,12 @@ class RSSM:
         action_entropies = []
         dream_log_probabilities = []
         for timestep in range(horizon):
-            
-            action_logits = actor(tf.stop_gradient(rssm_state.get_hidden_state_h_and_stochastic_state_z()))
+            action_logits = actor(tf.stop_gradient(rssm_state.get_stochastic_state_z_and_hidden_state_h()))
             action_distribution = tfp.distributions.OneHotCategorical(logits=action_logits)
             action = action_distribution.sample()
 
             rssm_state = self.dream(rssm_state, tf.expand_dims(tf.cast(tf.argmax(action, axis=-1), tf.float32), -1))
             next_rssm_states.append(rssm_state)
-            # TODO is this correct? only entropy of action?
             action_entropies.append(action_distribution.entropy())
             dream_log_probabilities.append(action_distribution.log_prob(tf.round(tf.stop_gradient(action))))
 
@@ -302,3 +304,25 @@ class RSSM:
         posterior_rssm_states = RSSMState.from_list(posterior_rssm_states)
 
         return prior_rssm_states, posterior_rssm_states
+
+class OneHotDist(tfp.distributions.OneHotCategorical):
+
+  def __init__(self, logits=None, probs=None, dtype=None):
+    self._sample_dtype = dtype or tf.float32
+    super().__init__(logits=logits, probs=probs)
+
+  def mode(self):
+    return tf.cast(super().mode(), self._sample_dtype)
+
+  def sample(self, sample_shape=(), seed=None):
+    # Straight through biased gradient estimator.
+    sample = tf.cast(super().sample(sample_shape, seed), self._sample_dtype)
+    probs = self._pad(super().probs_parameter(), sample.shape)
+    sample += tf.cast(probs - tf.stop_gradient(probs), self._sample_dtype)
+    return sample
+
+  def _pad(self, tensor, shape):
+    tensor = super().probs_parameter()
+    while len(tensor.shape) < len(shape):
+      tensor = tensor[None]
+    return tensor

@@ -26,16 +26,15 @@ class WorldModel:
                        self.reward_model,
                        self.discount_model)
 
-    def create_encoder(self, input_size: tuple = image_shape, output_size: int = hidden_unit_size):
-        # Third dimension might be obsolete
+    def create_encoder(self, input_size: tuple = image_shape, output_size: int = encoding_size):
         encoder_input = tf.keras.Input(shape=input_size)
-        x = Conv2D(16, (3, 3), activation="elu", padding="same")(encoder_input)  # 16 layers of filtered 192x48 features
-        x = MaxPooling2D((2, 2), padding="same")(x)  # 64 / 96x24
-        x = Conv2D(32, (3, 3), activation="elu", padding="same")(x)  # 64 / 96x24
-        x = MaxPooling2D((2, 2), padding="same")(x)  # 64 / 96x24
-        x = Conv2D(64, (3, 3), activation="elu", padding="same")(x)  # 64 / 48x12
-        x = MaxPooling2D((2, 2), padding="same")(x)  # 64 / 48x12
-        x = GlobalAveragePooling2D()(x)  # 64
+        x = Conv2D(32, (3, 3), activation="elu", padding="same")(encoder_input)
+        x = MaxPooling2D((2, 2), padding="same")(x)
+        x = Conv2D(64, (3, 3), activation="elu", padding="same")(x)
+        x = MaxPooling2D((2, 2), padding="same")(x)
+        x = Conv2D(128, (3, 3), activation="elu", padding="same")(x)
+        x = MaxPooling2D((2, 2), padding="same")(x)
+        x = GlobalAveragePooling2D()(x)
         encoder_output = Dense(output_size, activation="linear")(x)
 
         encoder = tf.keras.Model(encoder_input, encoder_output, name="Encoder")
@@ -51,14 +50,14 @@ class WorldModel:
     ):
         # Third dimension might be obsolete
         decoder_input = tf.keras.Input(shape=input_size)
-        # TODO WIE SCHLIMM IST EIN MLP HIER?
-        x = Dense(256, activation="elu")(decoder_input)
-        x = Reshape((32, 8, 1))(x)
-        # TODO Check whether correct reshape happens
-        # tf.debugging.assert_equal(x)
+        x = Dense(1024, activation="elu")(decoder_input)
+        x = Reshape((8, 2, 64))(x)
+        x = Conv2DTranspose(32, (3, 3), strides=2, activation="elu", padding="same")(x)
         x = Conv2DTranspose(16, (3, 3), strides=2, activation="elu", padding="same")(x)
+        x = Conv2DTranspose(8, (3, 3), strides=2, activation="elu", padding="same")(x)
+        x = Conv2DTranspose(8, (3, 3), strides=2, activation="elu", padding="same")(x)
         # x = BatchNormalization()(x)
-        x = Conv2DTranspose(1, (3, 3), strides=2, activation="linear", padding="same")(x)
+        x = Conv2D(1, (3, 3), strides=1, activation="linear", padding="same")(x)
 
         # x = Flatten()(x)
 
@@ -161,17 +160,14 @@ class WorldModel:
 
     def compute_actor_critic_loss(self, posterior_rssm_state: RSSMState):
 
-        # TODO At the moment we are using only batches and not batches of sequences#
         batched_posterior_rssm_states = RSSMState.detach(RSSMState.convert_sequences_to_batches(posterior_rssm_state, sequence_length=sequence_length - 1))
 
         dreamed_rssm_states, dreamed_log_probabilities, dreamed_policy_entropies = self.rssm.dreaming_rollout(horizon, self.actor, batched_posterior_rssm_states)
-        # TODO Why we need sometimes -1 and sometimes not?!!??!?!?!
         dreamed_log_probabilities = tf.reshape(dreamed_log_probabilities, [horizon, -1])  # batch_size * (sequence_length - 1)])
         dreamed_policy_entropies = tf.reshape(dreamed_policy_entropies, [horizon, -1])  # batch_size * (sequence_length - 1) ])
 
-        dreamed_hidden_state_h_and_stochastic_state_z = dreamed_rssm_states.get_hidden_state_h_and_stochastic_state_z()
+        dreamed_hidden_state_h_and_stochastic_state_z = dreamed_rssm_states.get_stochastic_state_z_and_hidden_state_h()
 
-        # TODO HARDCODED SHAPE!
         dreamed_hidden_state_h_and_stochastic_state_z = tf.reshape(dreamed_hidden_state_h_and_stochastic_state_z, (-1, hidden_unit_size + stochastic_state_size))
 
         self.set_trainable_models(self.models + self.rssm.models + (self.critic,) + (self.target_critic,), False)
@@ -182,7 +178,7 @@ class WorldModel:
 
         discount_logits = self.discount_model(dreamed_hidden_state_h_and_stochastic_state_z)
         discount_distribution = tfp.distributions.Independent(tfp.distributions.Bernoulli(logits=discount_logits), reinterpreted_batch_ndims=1)
-        dreamed_discount = discount_factor * tf.round(discount_distribution.prob(discount_distribution.mean()))
+        dreamed_discount = discount_factor * tf.round(discount_distribution.distribution.probs_parameter())
 
         target_value_logits = self.target_critic(dreamed_hidden_state_h_and_stochastic_state_z)
         target_value_distribution = tfp.distributions.Independent(tfp.distributions.Normal(target_value_logits, 1), reinterpreted_batch_ndims=1)
@@ -207,14 +203,14 @@ class WorldModel:
         discounts = tf.concat([tf.ones_like(dreamed_discount[:1]), dreamed_discount[1:]], 0)
         discount = tf.math.cumprod(discounts[:-1], 0)
         policy_entropy = dreamed_policy_entropies[1:]
-        actor_loss = -tf.math.reduce_sum(tf.math.reduce_mean(discount * (objective + actor_entropy_scale * policy_entropy), axis=1))  # TODO correct axis?
+        actor_loss = -tf.math.reduce_sum(tf.math.reduce_mean(discount * (objective + actor_entropy_scale * policy_entropy), axis=1))
         return actor_loss, discount, lambda_returns
 
     def critic_loss(self, dreamed_hidden_state_h_and_stochastic_state_z, discount, lambda_returns):
-        # TODO Why do we need sometimes -1 and sometimes not?!!??!?!?!
+        # TODO Why do we need sometimes -1 and sometimes not?!
         dreamed_hidden_state_h_and_stochastic_state_z = tf.reshape(dreamed_hidden_state_h_and_stochastic_state_z, (horizon, -1, hidden_unit_size + stochastic_state_size))  # batch_size * (sequence_length - 1), -1))
         critic_logits = self.critic(tf.stop_gradient(tf.reshape(dreamed_hidden_state_h_and_stochastic_state_z[:-1], (-1, hidden_unit_size + stochastic_state_size))))
-        # TODO Why do we need sometimes -1 and sometimes not?!!??!?!?!
+        # TODO Why do we need sometimes -1 and sometimes not?!
         critic_logits = tf.reshape(critic_logits, (horizon - 1, -1))  # batch_size * (sequence_length - 1)))
         critic_distribution = tfp.distributions.Independent(tfp.distributions.Normal(critic_logits, 1))
         critic_loss = -tf.reduce_mean(tf.stop_gradient(tf.reshape(discount, (horizon - 1, -1))) * tf.expand_dims(critic_distribution.log_prob(tf.stop_gradient(lambda_returns)), -1))
@@ -250,8 +246,6 @@ class WorldModel:
         - Reward log loss(Output reward network, obtained reward timestep t)
         - Discount log loss(Output of discount network, terminal state timestep t)
         """
-        # TODO check whether distribution.log_prob  (target) matches target size
-        # histogram von wahrsch. distribution /
         return -tf.math.reduce_mean(distribution.log_prob(target))
 
     def compute_kl_loss(self, prior_rssm_states, posterior_rssm_states, alpha=0.8):
@@ -262,13 +256,34 @@ class WorldModel:
         posterior: Z^
         """
         # TODO Do we need Straight Through Gradients here?
-        prior_distribution = tfp.distributions.Independent(tfp.distributions.OneHotCategorical(logits=prior_rssm_states.logits), reinterpreted_batch_ndims=1)
-        posterior_distribution = tfp.distributions.Independent(tfp.distributions.OneHotCategorical(logits=posterior_rssm_states.logits), reinterpreted_batch_ndims=1)
+        prior_distribution = tfp.distributions.Independent(OneHotDist(logits=prior_rssm_states.logits), reinterpreted_batch_ndims=1)
+        posterior_distribution = tfp.distributions.Independent(OneHotDist(logits=posterior_rssm_states.logits), reinterpreted_batch_ndims=1)
 
-        prior_distribution_detached = tfp.distributions.Independent(tfp.distributions.OneHotCategorical(logits=tf.stop_gradient(prior_rssm_states.logits)), reinterpreted_batch_ndims=1)
-        posterior_distribution_detached = tfp.distributions.Independent(tfp.distributions.OneHotCategorical(logits=tf.stop_gradient(posterior_rssm_states.logits)), reinterpreted_batch_ndims=1)
+        prior_distribution_detached = tfp.distributions.Independent(OneHotDist(logits=tf.stop_gradient(prior_rssm_states.logits)), reinterpreted_batch_ndims=1)
+        posterior_distribution_detached = tfp.distributions.Independent(OneHotDist(logits=tf.stop_gradient(posterior_rssm_states.logits)), reinterpreted_batch_ndims=1)
 
         # Loss with KL Balancing
-        # TODO check reihenfolge, reduce_mean hat Gradients?!!?
-        return alpha * tf.math.reduce_mean(tfp.distributions.kl_divergence(posterior_distribution_detached, prior_distribution)) + (
-                1 - alpha) * tf.math.reduce_mean(tfp.distributions.kl_divergence(posterior_distribution, prior_distribution_detached))
+        return alpha * tf.math.reduce_mean(tfp.distributions.kl_divergence(tf.stop_gradient(posterior_distribution_detached), prior_distribution)) + (
+                1 - alpha) * tf.math.reduce_mean(tfp.distributions.kl_divergence(posterior_distribution, tf.stop_gradient(prior_distribution_detached)))
+
+class OneHotDist(tfp.distributions.OneHotCategorical):
+
+  def __init__(self, logits=None, probs=None, dtype=None):
+    self._sample_dtype = dtype or tf.float32
+    super().__init__(logits=logits, probs=probs)
+
+  def mode(self):
+    return tf.cast(super().mode(), self._sample_dtype)
+
+  def sample(self, sample_shape=(), seed=None):
+    # Straight through biased gradient estimator.
+    sample = tf.cast(super().sample(sample_shape, seed), self._sample_dtype)
+    probs = self._pad(super().probs_parameter(), sample.shape)
+    sample += tf.cast(probs - tf.stop_gradient(probs), self._sample_dtype)
+    return sample
+
+  def _pad(self, tensor, shape):
+    tensor = super().probs_parameter()
+    while len(tensor.shape) < len(shape):
+      tensor = tensor[None]
+    return tensor

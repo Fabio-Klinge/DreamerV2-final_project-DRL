@@ -76,8 +76,6 @@ class Buffer:
         items: list or tuple of batched data from (50, 5)
 
         """
-        # Combine all values from "items" in tensor
-        # Not sure wether we need tf.nest.map_structure
         batched_values = tf.nest.map_structure(
             lambda t: tf.stack([t] * self.batch_size),
             items
@@ -89,9 +87,7 @@ class Buffer:
     def sample(self):
         data = self.buffer.as_dataset(num_steps=sequence_length, single_deterministic_pass=True)
 
-        # normalize inputs from 0/255 to -1/1
         data = data.map(lambda buffer_content, _: (((buffer_content[0] / 128.) - 1, (buffer_content[1] / 128.) - 1, buffer_content[2], buffer_content[3], buffer_content[4], buffer_content[5]), _))
         data = data.cache()
-        data = data.batch(batch_size, drop_remainder=True).prefetch(prefetch_size)  # TODO .batch(batch_size, drop_remainder=True)
-        # later we want these to be sequences (Do we though)
+        data = data.batch(batch_size, drop_remainder=True).prefetch(prefetch_size)
         return data
