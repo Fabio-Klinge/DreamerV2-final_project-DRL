@@ -43,6 +43,13 @@ class RSSMState(NamedTuple):
 
 
 class RSSM:
+    '''
+    Recurrent State-Space Model To create categorical representation of image states from the Environment.
+    Consists of: GRU cell creating latent space h, encoder network to create image state embeddings,
+        decoder Network to convert the categorical representations into images, 
+    
+    
+    '''
 
     def __init__(self) -> None:
         super().__init__()
@@ -62,6 +69,14 @@ class RSSM:
             input_size: tuple = (stochastic_state_size + action_size,),
             output_size: int = hidden_unit_size
     ):
+        '''       
+        Gets concatenation of flattend categorical representation z or z^ and the action a. 
+        Creates embedding using a dense layer as input for the Reccurent Neural Network (GRU cell).
+
+        :param: input_size: length of flattend z or z^ 
+        :param: output_size: length of the embedding 
+        :returns: embedding of z or z^ and a
+        '''
         state_action_input = tf.keras.Input(shape=input_size)
         state_action_output = Dense(output_size, activation="elu")(state_action_input)
 
@@ -73,12 +88,19 @@ class RSSM:
 
         return stochastic_state_action_embedder
 
-    # Contains GRU cell
     def create_rnn(
             self,
             input_size: tuple = (hidden_unit_size,),
             output_size: int = hidden_unit_size
     ):
+        '''
+        Creates a Recurrent Neural Network with latent space h as hidden state. Used to create categorical representations z or z^.
+        Does not use funtional API as layers.GRUCell() was not compatible.
+
+        :param: input_size: length of embedding created by the stochastic_state_action_embedder
+        :param: output_size: length of latent state h
+        :returns: a GRUCell with latent space h
+        '''
         return GRUCell(output_size)
 
         rnn_input = tf.keras.Input(shape=input_size)
@@ -93,12 +115,21 @@ class RSSM:
 
         return rnn
 
-    # Z^ in paper
     def create_prior_stochastic_state_embedder(
             self,
             input_size: tuple = hidden_unit_size,
             output_size: int = stochastic_state_size
     ):
+        '''
+        MLP to create flattend categorical representation z^. 
+        Solely created from learned latent space h it is used as state predictions in the A2C model.
+
+        :params: input_size: length of hidden state h 
+        :params: output_size size of flattend categorical representation
+        :returns: An MLP object to create flattend categorical representation z^
+
+
+        '''
         state_embedder_input = tf.keras.Input(shape=input_size)
         x = Dense(mlp_hidden_layer_size, activation="elu")(state_embedder_input)
         # Activation function removed
@@ -112,13 +143,21 @@ class RSSM:
 
         return create_prior_stochastic_state_embedder
 
-    # Z in paper
-    # Input size = concatenated output of RNN with output of CNN
     def create_posterior_stochastic_state_embedder(
             self,
             input_size: tuple = hidden_unit_size + hidden_unit_size,
             output_size: int = stochastic_state_size
     ):
+        '''
+        MLP to create  categorical representation z (flattend). 
+        Created from learned latent space h and the embedded output of the image encoder 
+        Used to train state predictions z^ in order to create predictions without environment input.
+
+        :params: input_size: length of hidden state h plus
+        :params: output_size size of categorical representation z (flattend)
+        :returns: An MLP object to create categorical representation z (flattend)
+
+        '''
         state_embedder_input = tf.keras.Input(shape=input_size)
         x = Dense(mlp_hidden_layer_size, activation="elu")(state_embedder_input)
         # Activation function removed
@@ -133,10 +172,14 @@ class RSSM:
         return create_posterior_stochastic_state_embedder
 
     def sample_stochastic_state(self, logits):
-        """
-        Gets probabilities for each element of class in each category.
-        Used to generate embeddings from logits.
-        """
+       '''
+        Uses probabilities for each element of class in each category of z or z^ (unflattend) to create
+            a One Hot Categorical distribution. Then samples from the distribution.
+
+        :param: logits: probabilities for each element of class in each category of z or z^ (unflattend)
+        :returns: sampled categorical representation z or z^	
+        '''
+
 
         # Logit Outputs from MLP
         logits = tf.reshape(logits, shape=(-1, *stochastic_state_shape))
@@ -151,9 +194,15 @@ class RSSM:
         return tf.reshape(sample, (-1, *stochastic_state_shape))
 
     def dream(self, previous_rssm_state: RSSMState, previous_action: tf.Tensor, non_terminal: tf.Tensor = tf.constant(1.0)):
-        """
-        Creates Z^
-        """
+        '''
+        Creates a dreamed categorical representation z^ by feeding the previous z or z^, action and flipped terminal to the model. 
+
+        :param: previous_rssm_state: RSSMState object containing previous z or z^
+        :param: previous_action: action taken in previous step
+        :param: non_terminal: 1 if not terminal, 0.0 if terminal
+        :returns: categorical representation z^
+
+        '''
         # TODO ÄNDERN
         stochastic_state_z = tf.reshape(previous_rssm_state.stochastic_state_z, (-1, stochastic_state_size))
         # Embedding of concatenation prior z and action (t-1)
@@ -178,8 +227,14 @@ class RSSM:
         return prior_rssm_state
 
     def dreaming_rollout(self, horizon: int, actor: tf.keras.Model, previous_rssm_state: RSSMState):
+ 
         """
-        Rollout only Z
+        Output a rollout of z^ of length horizon as "dream" for the actor model.
+
+        :param: horizon: length of rollout
+        :param: actor: actor model
+        :param: previous_rssm_state: RSSMState object containing previous z or z^
+        :returns: rollout of z^
         """
         rssm_state = previous_rssm_state
 
@@ -187,6 +242,7 @@ class RSSM:
         action_entropies = []
         dream_log_probabilities = []
         for timestep in range(horizon):
+            
             action_logits = actor(tf.stop_gradient(rssm_state.get_hidden_state_h_and_stochastic_state_z()))
             action_distribution = tfp.distributions.OneHotCategorical(logits=action_logits)
             action = action_distribution.sample()
@@ -205,6 +261,8 @@ class RSSM:
 
     def observe(self, encoded_state: tf.Tensor, previous_action: tf.Tensor, previous_non_terminal: tf.Tensor, previous_rssm_state: RSSMState):
         """
+        Creates a dreamed categorical representation z^ by feeding the previous z or z^, action and flipped terminal to the model. 
+
         Creates Z' and Z
         """
         # Obtain Z^
