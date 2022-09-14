@@ -46,6 +46,7 @@ class Agent:
         done = False
         previous_rssm_state = RSSMState()
         episode = 0
+        sequence_step = 0
         scores = [[]]
 
         for step in range(steps):
@@ -60,18 +61,20 @@ class Agent:
             scores[episode].append(reward)
 
             self.buffer.add((
-                self.preprocess_data(action, done, next_state, reward, state, step)
+                self.preprocess_data(action, done, next_state, reward, state, sequence_step)
             ))
 
             # Update for next iteration
             state = next_state
             previous_action = action
+            sequence_step += 1
             # previous_rssm_state = posterior_rssm_state
 
             # Terminal state
             if done:
                 state = self.env.reset()
                 action = self.env.action_space.sample()
+                sequence_step = 0
                 done = False
                 previous_rssm_state = RSSMState()
 
