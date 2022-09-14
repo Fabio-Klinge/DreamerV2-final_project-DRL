@@ -1,6 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras.layers import Dense, Layer, Conv2DTranspose, Conv2D, GlobalAveragePooling2D, Reshape, BatchNormalization, GRUCell, MaxPooling2D, Flatten, RNN
 import tensorflow_probability as tfp
+from Utils import OneHotDist
 
 from RSSM import RSSM, RSSMState
 from Parameters import *
@@ -71,7 +72,7 @@ class WorldModel:
 
         return decoder
 
-        # Input: concatination of h and z
+        # Input: concatenation of h and z
 
     # Output: float predicting the obtained reward
     def create_reward_predictor(
@@ -84,7 +85,7 @@ class WorldModel:
         x = Dense(mlp_hidden_layer_size, activation="elu")(x)
         x = Dense(mlp_hidden_layer_size, activation="elu")(x)
         x = Dense(output_size)(x)
-        # Creates indipendent normal distribution
+        # Creates independent normal distribution
         # Hope is that it learns to output variables over reward space [0,1]
         # reward_predictor_output = tfp.layers.IndependentNormal()(x)
 
@@ -96,7 +97,7 @@ class WorldModel:
 
         return reward_predictor
 
-        # Input: concatination of h and z
+        # Input: concatenation of h and z
 
     # Output: float predicting the obtained reward
     def create_discount_predictor(
@@ -159,6 +160,9 @@ class WorldModel:
         return actor
 
     def compute_actor_critic_loss(self, posterior_rssm_state: RSSMState):
+        """
+        Computes the loss for the actor and critic networks using the posterior state z.
+        """
 
         batched_posterior_rssm_states = RSSMState.detach(RSSMState.convert_sequences_to_batches(posterior_rssm_state, sequence_length=sequence_length - 1))
 
@@ -171,7 +175,7 @@ class WorldModel:
         dreamed_hidden_state_h_and_stochastic_state_z = tf.reshape(dreamed_hidden_state_h_and_stochastic_state_z, (-1, hidden_unit_size + stochastic_state_size))
 
         self.set_trainable_models(self.models + self.rssm.models + (self.critic,) + (self.target_critic,), False)
-        ########################################
+        ######################################## # Marks Beginning of Non-Trainable Models
         reward_logits = self.reward_model(dreamed_hidden_state_h_and_stochastic_state_z)
         reward_distribution = tfp.distributions.Independent(tfp.distributions.Normal(reward_logits, 1), reinterpreted_batch_ndims=1)
         dreamed_reward = reward_distribution.mean()
@@ -183,7 +187,7 @@ class WorldModel:
         target_value_logits = self.target_critic(dreamed_hidden_state_h_and_stochastic_state_z)
         target_value_distribution = tfp.distributions.Independent(tfp.distributions.Normal(target_value_logits, 1), reinterpreted_batch_ndims=1)
         dreamed_value = target_value_distribution.mean()
-        ########################################
+        ######################################## # Marks End of Non-Trainable Models
         self.set_trainable_models(self.models + self.rssm.models + (self.critic,) + (self.target_critic,), True)
 
         actor_loss, discount, lambda_returns = self.actor_loss(dreamed_reward, dreamed_value, dreamed_discount, dreamed_log_probabilities, dreamed_policy_entropies)
@@ -192,6 +196,9 @@ class WorldModel:
         return actor_loss, critic_loss
 
     def actor_loss(self, dreamed_reward, dreamed_value, dreamed_discount, dreamed_log_probabilities, dreamed_policy_entropies, actor_entropy_scale=0.001, lmbda=0.95):
+        """
+        Computes the actor loss
+        """
         dreamed_reward = tf.reshape(dreamed_reward, (horizon, -1))
         dreamed_value = tf.reshape(dreamed_value, (horizon, -1))
         dreamed_discount = tf.reshape(dreamed_discount, (horizon, -1))
@@ -207,6 +214,9 @@ class WorldModel:
         return actor_loss, discount, lambda_returns
 
     def critic_loss(self, dreamed_hidden_state_h_and_stochastic_state_z, discount, lambda_returns):
+        """
+        Computes the critic loss
+        """
         # TODO Why do we need sometimes -1 and sometimes not?!
         dreamed_hidden_state_h_and_stochastic_state_z = tf.reshape(dreamed_hidden_state_h_and_stochastic_state_z, (horizon, -1, hidden_unit_size + stochastic_state_size))  # batch_size * (sequence_length - 1), -1))
         critic_logits = self.critic(tf.stop_gradient(tf.reshape(dreamed_hidden_state_h_and_stochastic_state_z[:-1], (-1, hidden_unit_size + stochastic_state_size))))
@@ -222,6 +232,9 @@ class WorldModel:
                        discount,
                        bootstrap,
                        lmbda):
+        """
+        Computes the lambda returns
+        """
         next_values = tf.concat([value[1:], bootstrap[None]], 0)
         target = reward + discount + next_values * (1 - lmbda)
         timesteps = list(range(reward.shape[0] - 1, -1, -1))
@@ -236,6 +249,9 @@ class WorldModel:
         return returns
 
     def set_trainable_models(self, models, trainable: bool):
+        """
+        Set the trainable flag of the given models.
+        """
         for model in models:
             model.trainable = trainable
 
@@ -250,12 +266,10 @@ class WorldModel:
 
     def compute_kl_loss(self, prior_rssm_states, posterior_rssm_states, alpha=0.8):
         """
+        Computes the KL loss. Formula is given by the original DreamerV2 paper.
         alpha: weigh between training the prior toward the representations & regularizing
          the representations towards the prior
-        prior: Z
-        posterior: Z^
         """
-        # TODO Do we need Straight Through Gradients here?
         prior_distribution = tfp.distributions.Independent(OneHotDist(logits=prior_rssm_states.logits), reinterpreted_batch_ndims=1)
         posterior_distribution = tfp.distributions.Independent(OneHotDist(logits=posterior_rssm_states.logits), reinterpreted_batch_ndims=1)
 
@@ -265,25 +279,3 @@ class WorldModel:
         # Loss with KL Balancing
         return alpha * tf.math.reduce_mean(tfp.distributions.kl_divergence(tf.stop_gradient(posterior_distribution_detached), prior_distribution)) + (
                 1 - alpha) * tf.math.reduce_mean(tfp.distributions.kl_divergence(posterior_distribution, tf.stop_gradient(prior_distribution_detached)))
-
-class OneHotDist(tfp.distributions.OneHotCategorical):
-
-  def __init__(self, logits=None, probs=None, dtype=None):
-    self._sample_dtype = dtype or tf.float32
-    super().__init__(logits=logits, probs=probs)
-
-  def mode(self):
-    return tf.cast(super().mode(), self._sample_dtype)
-
-  def sample(self, sample_shape=(), seed=None):
-    # Straight through biased gradient estimator.
-    sample = tf.cast(super().sample(sample_shape, seed), self._sample_dtype)
-    probs = self._pad(super().probs_parameter(), sample.shape)
-    sample += tf.cast(probs - tf.stop_gradient(probs), self._sample_dtype)
-    return sample
-
-  def _pad(self, tensor, shape):
-    tensor = super().probs_parameter()
-    while len(tensor.shape) < len(shape):
-      tensor = tensor[None]
-    return tensor

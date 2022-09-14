@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras.layers import Dense, Layer, Conv2DTranspose, Conv2D, GlobalAveragePooling2D, Reshape, BatchNormalization, GRUCell, MaxPooling2D, Flatten, RNN
 import tensorflow_probability as tfp
-
+from Utils import OneHotDist
 from typing import NamedTuple
 
 from Parameters import *
@@ -47,8 +47,6 @@ class RSSM:
     Recurrent State-Space Model To create categorical representation of image states from the Environment.
     Consists of: GRU cell creating latent space h, encoder network to create image state embeddings,
         decoder Network to convert the categorical representations into images, 
-    
-    
     """
 
     def __init__(self) -> None:
@@ -101,19 +99,20 @@ class RSSM:
         :param: output_size: length of latent state h
         :returns: a GRUCell with latent space h
         """
-        return GRUCell(output_size)
+        return GRUCell(output_size)  # Works and has nearly no points of failure. So we use it over the Legacy Code, down below.
 
-        rnn_input = tf.keras.Input(shape=input_size)
-        # rnn_hidden_state_placeholder = tf.keras.Input(shape=(hidden_unit_size,))
-        rnn_output = rnn = tf.keras.layers.RNN(tf.keras.layers.GRUCell(output_size))(rnn_input)
-
-        rnn = tf.keras.Model(
-            rnn_input,
-            rnn_output,
-            name="rnn"
-        )
-
-        return rnn
+        # # Legacy Code that doesn't work as expected
+        # rnn_input = tf.keras.Input(shape=input_size)
+        # # rnn_hidden_state_placeholder = tf.keras.Input(shape=(hidden_unit_size,))
+        # rnn_output = rnn = tf.keras.layers.RNN(tf.keras.layers.GRUCell(output_size))(rnn_input)
+        #
+        # rnn = tf.keras.Model(
+        #     rnn_input,
+        #     rnn_output,
+        #     name="rnn"
+        # )
+        #
+        # return rnn
 
     def create_prior_stochastic_state_embedder(
             self,
@@ -133,7 +132,6 @@ class RSSM:
         state_embedder_input = tf.keras.Input(shape=input_size)
         x = Dense(mlp_hidden_layer_size, activation="elu")(state_embedder_input)
         x = Dense(output_size, activation="elu")(x)
-        # Activation function removed
         state_embedder_output = Dense(output_size)(x)
 
         create_prior_stochastic_state_embedder = tf.keras.Model(
@@ -184,18 +182,17 @@ class RSSM:
         # Logit Outputs from MLP
         logits = tf.reshape(logits, shape=(-1, *stochastic_state_shape))
 
-        sample = OneHotDist(logitsT=logits, dtypeT=tf.float32).sample()
+        sample = OneHotDist(logits=logits, dtype=tf.float32).sample()
 
         return tf.reshape(sample, (-1, *stochastic_state_shape))
 
-        # OneHot distribution over logits
-        logits_distribution = tfp.distributions.OneHotCategorical(logits=logits)
-        # Sample from OneHot distribution
-        sample = tf.cast(logits_distribution.sample(), tf.float32)
-        # TODO Remove tf.expand_dims - shouldn't be necessary
-        sample = sample + tf.expand_dims(logits_distribution.prob(sample) - tf.stop_gradient(logits_distribution.prob(sample)), -1)
-
-        return tf.reshape(sample, (-1, *stochastic_state_shape))
+        # # OneHot distribution over logits
+        # logits_distribution = tfp.distributions.OneHotCategorical(logits=logits)
+        # # Sample from OneHot distribution
+        # sample = tf.cast(logits_distribution.sample(), tf.float32)
+        # sample = sample + tf.expand_dims(logits_distribution.prob(sample) - tf.stop_gradient(logits_distribution.prob(sample)), -1)
+        #
+        # return tf.reshape(sample, (-1, *stochastic_state_shape))
 
     def dream(self, previous_rssm_state: RSSMState, previous_action: tf.Tensor, non_terminal: tf.Tensor = tf.constant(1.0)):
         """
@@ -207,16 +204,14 @@ class RSSM:
         :returns: categorical representation z^
 
         """
-        # TODO ÄNDERN
         stochastic_state_z = tf.reshape(previous_rssm_state.stochastic_state_z, (-1, stochastic_state_size))
-        # Embedding of concatenation prior z and action (t-1) # TODO stochastic_state_z in wrong form ?! non_terminal: 50,1 vs 50,1024
+        # Embedding of concatenation prior z and action (t-1)
         state_action_embedding = self.state_action_embedder(tf.concat([stochastic_state_z * non_terminal, previous_action], axis=-1))
 
         # Create h from GRU with old h (t-1) and the embedding
         state_action_embedding = tf.reshape(state_action_embedding, shape=(-1, hidden_unit_size))
         # previous_rssm_state.hidden_rnn_state = tf.reshape(previous_rssm_state.hidden_rnn_state, shape=(-1, 200))
 
-        # TODO Which is the correct output? First or last?
         _, hidden_rnn_state = self.rnn(state_action_embedding, tf.reshape(previous_rssm_state.hidden_rnn_state_h * non_terminal, (-1, hidden_unit_size)))
 
         # Logits created from h (with MLP) to create Z^
@@ -281,13 +276,21 @@ class RSSM:
         return prior_rssm_state, posterior_rssm_state
 
     def observing_rollout(self, encoded_states: tf.Tensor, actions: tf.Tensor, non_terminals: tf.Tensor, previous_rssm_state: RSSMState):
+        """
+
+        :param encoded_states:
+        :param actions:
+        :param non_terminals:
+        :param previous_rssm_state:
+        :return:
+        """
         prior_rssm_states = []
         posterior_rssm_states = []
 
         for sequence_index in range(sequence_length):
             encoded_state, action, non_terminal = encoded_states[:, sequence_index], actions[:, sequence_index], non_terminals[:, sequence_index]
 
-            # ?? 0 if terminal state is reached
+            # 0 if terminal state is reached
             previous_action = action * non_terminal
             # Z^, Z
             prior_rssm_state, posterior_rssm_state = self.observe(encoded_state, previous_action, non_terminal, previous_rssm_state)
@@ -302,26 +305,3 @@ class RSSM:
         posterior_rssm_states = RSSMState.from_list(posterior_rssm_states)
 
         return prior_rssm_states, posterior_rssm_states
-
-
-
-class OneHotDist(tfp.distributions.OneHotCategorical):
-    def __init__(self, logitsT: tf.Tensor=None, probsT: tf.Tensor=None, dtypeT=None):
-        self._sample_dtype = dtypeT or tf.float32
-        super(OneHotDist, self).__init__(logits=logitsT, probs=probsT)
-
-    def mode(self):
-        return tf.cast(super().mode(), self._sample_dtype)
-
-    def sample(self, sample_shape=(), seed=None):
-        # Straight through biased gradient estimator.
-        sample = tf.cast(super().sample(sample_shape, seed), self._sample_dtype)
-        probs = self._pad(super().probs_parameter(), sample.shape)
-        sample += tf.cast(probs - tf.stop_gradient(probs), self._sample_dtype)
-        return sample
-
-    def _pad(self, tensor, shape):
-        tensor = super().probs_parameter()
-        while len(tensor.shape) < len(shape):
-            tensor = tensor[None]
-        return tensor

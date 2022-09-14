@@ -33,7 +33,7 @@ class Agent:
 
         self.world_model: WorldModel = world_model
 
-    def create_trajectories(self, steps = sys.maxsize, episodes = 0):
+    def create_trajectories(self, steps=sys.maxsize, episodes=0):
         '''
         Collect data from environment and save it to Experience Replay Buffer. Only give one parameter, this decides the mode of collecting trajectories.
 
@@ -85,6 +85,7 @@ class Agent:
                 scores.append([])
 
         return scores
+
     def preprocess_data(self, action, done, next_state, reward, state, step):
         '''
         Adjusts data to the specific shape and type needed for the Experience Replay Buffer.
@@ -102,7 +103,7 @@ class Agent:
                self.preprocess_action(action), \
                self.preprocess_reward(reward), \
                self.preprocess_done(done), \
-                tf.cast(tf.constant(step, shape=self.data_spec[5].shape.as_list()), tf.float32)
+               tf.cast(tf.constant(step, shape=self.data_spec[5].shape.as_list()), tf.float32)
 
     def preprocess_next_state(self, next_state):
         return tf.cast(tf.constant(next_state, shape=self.data_spec[1].shape.as_list()), tf.float32)

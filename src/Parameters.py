@@ -4,21 +4,17 @@ import tensorflow as tf
 image_shape = (128, 32, 1)
 buffer_length = 100000
 
-# Long term memory of GRU
 hidden_unit_size = 400
 encoding_size = 512
 
-# Z in paper
 stochastic_state_shape = (32, 32)
 stochastic_state_size = stochastic_state_shape[0] * stochastic_state_shape[1]
 
-#
 action_size = 1
 action_space_size = 5
 horizon = 10
 discount_factor = 0.995
 
-#
 mlp_hidden_layer_size = 400
 batch_size = 50
 prefetch_size = 10
