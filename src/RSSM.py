@@ -8,9 +8,9 @@ from Parameters import *
 
 
 class RSSMState(NamedTuple):
-    logits: tf.Tensor = tf.zeros(shape=(stochastic_state_size,))
-    stochastic_state_z: tf.Tensor = tf.zeros(shape=(stochastic_state_size,))
-    hidden_rnn_state_h: tf.Tensor = tf.zeros(shape=(hidden_unit_size,))
+    logits: tf.Tensor = tf.zeros(shape=(batch_size, stochastic_state_size,))
+    stochastic_state_z: tf.Tensor = tf.zeros(shape=(batch_size, stochastic_state_size,))
+    hidden_rnn_state_h: tf.Tensor = tf.zeros(shape=(batch_size, hidden_unit_size,))
 
     @classmethod
     def from_list(cls, rssm_states):
@@ -43,13 +43,13 @@ class RSSMState(NamedTuple):
 
 
 class RSSM:
-    '''
+    """
     Recurrent State-Space Model To create categorical representation of image states from the Environment.
     Consists of: GRU cell creating latent space h, encoder network to create image state embeddings,
         decoder Network to convert the categorical representations into images, 
     
     
-    '''
+    """
 
     def __init__(self) -> None:
         super().__init__()
@@ -69,14 +69,14 @@ class RSSM:
             input_size: tuple = (stochastic_state_size + action_size,),
             output_size: int = hidden_unit_size
     ):
-        '''       
+        """       
         Gets concatenation of flattend categorical representation z or z^ and the action a. 
         Creates embedding using a dense layer as input for the Reccurent Neural Network (GRU cell).
 
         :param: input_size: length of flattend z or z^ 
         :param: output_size: length of the embedding 
         :returns: embedding of z or z^ and a
-        '''
+        """
         state_action_input = tf.keras.Input(shape=input_size)
         state_action_output = Dense(output_size, activation="elu")(state_action_input)
 
@@ -93,14 +93,14 @@ class RSSM:
             input_size: tuple = (hidden_unit_size,),
             output_size: int = hidden_unit_size
     ):
-        '''
+        """
         Creates a Recurrent Neural Network with latent space h as hidden state. Used to create categorical representations z or z^.
         Does not use funtional API as layers.GRUCell() was not compatible.
 
         :param: input_size: length of embedding created by the stochastic_state_action_embedder
         :param: output_size: length of latent state h
         :returns: a GRUCell with latent space h
-        '''
+        """
         return GRUCell(output_size)
 
         rnn_input = tf.keras.Input(shape=input_size)
@@ -120,7 +120,7 @@ class RSSM:
             input_size: tuple = hidden_unit_size,
             output_size: int = stochastic_state_size
     ):
-        '''
+        """
         MLP to create flattend categorical representation z^. 
         Solely created from learned latent space h it is used as state predictions in the A2C model.
 
@@ -129,7 +129,7 @@ class RSSM:
         :returns: An MLP object to create flattend categorical representation z^
 
 
-        '''
+        """
         state_embedder_input = tf.keras.Input(shape=input_size)
         x = Dense(mlp_hidden_layer_size, activation="elu")(state_embedder_input)
         x = Dense(output_size, activation="elu")(x)
@@ -149,7 +149,7 @@ class RSSM:
             input_size: tuple = encoding_size + hidden_unit_size,
             output_size: int = stochastic_state_size
     ):
-        '''
+        """
         MLP to create  categorical representation z (flattend). 
         Created from learned latent space h and the embedded output of the image encoder 
         Used to train state predictions z^ in order to create predictions without environment input.
@@ -158,7 +158,7 @@ class RSSM:
         :params: output_size size of categorical representation z (flattend)
         :returns: An MLP object to create categorical representation z (flattend)
 
-        '''
+        """
         state_embedder_input = tf.keras.Input(shape=input_size)
         x = Dense(mlp_hidden_layer_size, activation="elu")(state_embedder_input)
         x = Dense(output_size, activation="elu")(x)
@@ -173,13 +173,13 @@ class RSSM:
         return create_posterior_stochastic_state_embedder
 
     def sample_stochastic_state(self, logits):
-       '''
+        """
         Uses probabilities for each element of class in each category of z or z^ (unflattend) to create
             a One Hot Categorical distribution. Then samples from the distribution.
 
         :param: logits: probabilities for each element of class in each category of z or z^ (unflattend)
-        :returns: sampled categorical representation z or z^	
-        '''
+        :returns: sampled categorical representation z or z^
+        """
 
 
         # Logit Outputs from MLP
@@ -200,7 +200,7 @@ class RSSM:
         return tf.reshape(sample, (-1, *stochastic_state_shape))
 
     def dream(self, previous_rssm_state: RSSMState, previous_action: tf.Tensor, non_terminal: tf.Tensor = tf.constant(1.0)):
-        '''
+        """
         Creates a dreamed categorical representation z^ by feeding the previous z or z^, action and flipped terminal to the model. 
 
         :param: previous_rssm_state: RSSMState object containing previous z or z^
@@ -208,7 +208,7 @@ class RSSM:
         :param: non_terminal: 1 if not terminal, 0.0 if terminal
         :returns: categorical representation z^
 
-        '''
+        """
         # TODO ÄNDERN
         stochastic_state_z = tf.reshape(previous_rssm_state.stochastic_state_z, (-1, stochastic_state_size))
         # Embedding of concatenation prior z and action (t-1) # TODO stochastic_state_z in wrong form ?! non_terminal: 50,1 vs 50,1024

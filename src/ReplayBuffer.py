@@ -6,13 +6,14 @@ from Parameters import *
 
 
 class Buffer:
+    # TODO Changed Buffer Size to 100000 from 1000000
 
     def __init__(
             self,
             batch_size: int = 1,
-            buffer_length: int = 10000,
-            observation_size: tuple = (128, 32, 1),
-            action_size: int = 1
+            buffer_length: int = buffer_length,
+            observation_size: tuple = image_shape,
+            action_size: int = action_size
     ):
         """
         Create replay buffer
@@ -50,7 +51,6 @@ class Buffer:
             ),
             tf.TensorSpec(
                 shape=[1, ],
-                # Either 0 or 1
                 dtype=tf.dtypes.float32,
                 name="Non-Terminal State"
             ),

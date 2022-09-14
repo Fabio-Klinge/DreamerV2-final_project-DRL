@@ -1,7 +1,9 @@
 # DRL Project - DreamerV2
 **Project for Deep Reinforcement Learning Course Summer Semester 2022 Cognitive Science at University Osnabrück**
 
-NOT WORKING PROPERLY - DON'T USE IT, IF YOU NEED RESULTS!
+**[Link](https://youtu.be/b9tXz8ae5HI) to our Video Presentation of our Project**
+
+DreamerV2 NOT WORKING PROPERLY - DON'T USE IT, IF YOU NEED RESULTS!
 
 <!-- ABOUT THE PROJECT -->
 ## About The Project

@@ -2,6 +2,7 @@ import tensorflow as tf
 
 # Image size
 image_shape = (128, 32, 1)
+buffer_length = 10000
 
 # Long term memory of GRU
 hidden_unit_size = 400
