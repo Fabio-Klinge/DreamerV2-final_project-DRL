@@ -1,10 +1,10 @@
-import tensorflow as tf
-from tensorflow.keras.layers import Dense, Layer, Conv2DTranspose, Conv2D, GlobalAveragePooling2D, Reshape, BatchNormalization, GRUCell, MaxPooling2D, Flatten, RNN
-import tensorflow_probability as tfp
-from Utils import OneHotDist
 from typing import NamedTuple
 
+import tensorflow_probability as tfp
+from tensorflow.keras.layers import Dense, GRUCell
+
 from Parameters import *
+from Utils import OneHotDist
 
 
 class RSSMState(NamedTuple):

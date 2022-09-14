@@ -1,10 +1,8 @@
 import sys
 
-import numpy as np
+import gym
 import tensorflow as tf
 import tensorflow_probability as tfp
-import gym
-import highway_env
 
 from RSSM import RSSMState
 from ReplayBuffer import Buffer

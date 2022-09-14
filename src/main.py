@@ -1,21 +1,20 @@
-import tensorflow as tf
-import tensorflow_probability as tfp
-import tf_agents
+import logging
 
 import numpy as np
-
-from RSSM import RSSM, RSSMState
-from WorldModel import WorldModel
-from ReplayBuffer import Buffer
-from Agent import Agent
-from Trainer import Trainer
-from Parameters import *
+import tf_agents
 
 import wandb
-import logging
-logging.disable(logging.WARNING) # Because of OneHotDist class, which we copied directly from DreamerV2 author repository, we get a LOT of warnings. Those are not important, but also not easily fixed.
+from Agent import Agent
+from Parameters import *
+from ReplayBuffer import Buffer
+from Trainer import Trainer
+from WorldModel import WorldModel
+
+logging.disable(logging.WARNING)  # Because of OneHotDist class, which we copied directly from DreamerV2 author repository, we get a LOT of warnings. Those are not important, but also not easily fixed.
+
+
 def main():
-    wandb.init(name='DreamerV2', settings=wandb.Settings(_disable_stats=True), sync_tensorboard=True, mode="online" if use_wandb else "disabled")
+    wandb.init(project="DreamerV2", name='Training', settings=wandb.Settings(_disable_stats=True), sync_tensorboard=True, mode="online" if use_wandb else "disabled")
 
     buffer = Buffer()
     world_model = WorldModel()

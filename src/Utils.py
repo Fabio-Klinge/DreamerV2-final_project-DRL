@@ -6,6 +6,7 @@ class OneHotDist(tfp.distributions.OneHotCategorical):
     """
     Implements Straight-Through Gradients when sampling. Copied from original DreamerV2 author repository. Still outputs a LOT of incorrect warnings. Those are not important, but not easily fixed.
     """
+
     def __init__(self, logits: tf.Tensor = None, probs: tf.Tensor = None, dtype=None):
         self._sample_dtype = dtype or tf.float32
         super(OneHotDist, self).__init__(logits=logits, probs=probs)

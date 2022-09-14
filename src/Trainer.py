@@ -1,16 +1,11 @@
 from functools import reduce
 from operator import add
 
-import tensorflow as tf
 import tensorflow_probability as tfp
 
 import wandb
-
-from RSSM import RSSM, RSSMState
-from WorldModel import WorldModel
-from ReplayBuffer import Buffer
-from Agent import Agent
 from Parameters import *
+from RSSM import RSSMState
 
 
 class Trainer:

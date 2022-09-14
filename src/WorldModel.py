@@ -1,10 +1,9 @@
-import tensorflow as tf
-from tensorflow.keras.layers import Dense, Layer, Conv2DTranspose, Conv2D, GlobalAveragePooling2D, Reshape, BatchNormalization, GRUCell, MaxPooling2D, Flatten, RNN
 import tensorflow_probability as tfp
-from Utils import OneHotDist
+from tensorflow.keras.layers import Dense, Conv2DTranspose, Conv2D, GlobalAveragePooling2D, Reshape, MaxPooling2D
 
-from RSSM import RSSM, RSSMState
 from Parameters import *
+from RSSM import RSSM, RSSMState
+from Utils import OneHotDist
 
 
 class WorldModel:
