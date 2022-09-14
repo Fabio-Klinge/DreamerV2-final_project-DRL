@@ -8,9 +8,9 @@ from Parameters import *
 
 
 class RSSMState(NamedTuple):
-    logits: tf.Tensor = tf.zeros(shape=(batch_size, stochastic_state_size,))
-    stochastic_state_z: tf.Tensor = tf.zeros(shape=(batch_size, stochastic_state_size,))
-    hidden_rnn_state_h: tf.Tensor = tf.zeros(shape=(batch_size, hidden_unit_size,))
+    logits: tf.Tensor = tf.zeros(shape=(stochastic_state_size,))
+    stochastic_state_z: tf.Tensor = tf.zeros(shape=(stochastic_state_size,))
+    hidden_rnn_state_h: tf.Tensor = tf.zeros(shape=(hidden_unit_size,))
 
     @classmethod
     def from_list(cls, rssm_states):
@@ -181,14 +181,12 @@ class RSSM:
         :returns: sampled categorical representation z or z^
         """
 
-
         # Logit Outputs from MLP
         logits = tf.reshape(logits, shape=(-1, *stochastic_state_shape))
 
-        sample = OneHotDist(logits=logits, dtype=tf.float32).sample()
+        sample = OneHotDist(logitsT=logits, dtypeT=tf.float32).sample()
 
         return tf.reshape(sample, (-1, *stochastic_state_shape))
-
 
         # OneHot distribution over logits
         logits_distribution = tfp.distributions.OneHotCategorical(logits=logits)
@@ -231,7 +229,7 @@ class RSSM:
         return prior_rssm_state
 
     def dreaming_rollout(self, horizon: int, actor: tf.keras.Model, previous_rssm_state: RSSMState):
- 
+
         """
         Output a rollout of z^ of length horizon as "dream" for the actor model.
 
@@ -305,24 +303,25 @@ class RSSM:
 
         return prior_rssm_states, posterior_rssm_states
 
+
+
 class OneHotDist(tfp.distributions.OneHotCategorical):
+    def __init__(self, logitsT: tf.Tensor=None, probsT: tf.Tensor=None, dtypeT=None):
+        self._sample_dtype = dtypeT or tf.float32
+        super(OneHotDist, self).__init__(logits=logitsT, probs=probsT)
 
-  def __init__(self, logits=None, probs=None, dtype=None):
-    self._sample_dtype = dtype or tf.float32
-    super().__init__(logits=logits, probs=probs)
+    def mode(self):
+        return tf.cast(super().mode(), self._sample_dtype)
 
-  def mode(self):
-    return tf.cast(super().mode(), self._sample_dtype)
+    def sample(self, sample_shape=(), seed=None):
+        # Straight through biased gradient estimator.
+        sample = tf.cast(super().sample(sample_shape, seed), self._sample_dtype)
+        probs = self._pad(super().probs_parameter(), sample.shape)
+        sample += tf.cast(probs - tf.stop_gradient(probs), self._sample_dtype)
+        return sample
 
-  def sample(self, sample_shape=(), seed=None):
-    # Straight through biased gradient estimator.
-    sample = tf.cast(super().sample(sample_shape, seed), self._sample_dtype)
-    probs = self._pad(super().probs_parameter(), sample.shape)
-    sample += tf.cast(probs - tf.stop_gradient(probs), self._sample_dtype)
-    return sample
-
-  def _pad(self, tensor, shape):
-    tensor = super().probs_parameter()
-    while len(tensor.shape) < len(shape):
-      tensor = tensor[None]
-    return tensor
+    def _pad(self, tensor, shape):
+        tensor = super().probs_parameter()
+        while len(tensor.shape) < len(shape):
+            tensor = tensor[None]
+        return tensor

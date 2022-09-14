@@ -2,7 +2,7 @@ import tensorflow as tf
 
 # Image size
 image_shape = (128, 32, 1)
-buffer_length = 10000
+buffer_length = 100000
 
 # Long term memory of GRU
 hidden_unit_size = 400
@@ -22,7 +22,7 @@ discount_factor = 0.995
 mlp_hidden_layer_size = 400
 batch_size = 50
 prefetch_size = 10
-sequence_length = 10
+sequence_length = 20
 
 epochs = 2048
 target_update_every = 5
@@ -31,7 +31,7 @@ continue_training_from_latest_checkpoint = False
 logging_weights = False
 use_wandb = True
 
-optimizer_world_model = tf.keras.optimizers.Adam(0.0002, clipnorm=100.0,epsilon=1e-05)
+optimizer_world_model = tf.keras.optimizers.Adam(0.002, clipnorm=100.0, epsilon=1e-05)
 optimizer_actor = tf.keras.optimizers.Adam(4e-5, clipnorm=100.0)
 optimizer_critic = tf.keras.optimizers.Adam(1e-4, clipnorm=100.0)
 

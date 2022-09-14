@@ -21,8 +21,7 @@ class Trainer:
         combined_trainable_variables = reduce(add, [model.trainable_variables for model in (world_model.models + world_model.rssm.models)])
 
         for batches_of_sequences, _ in dataset:
-            # TODO SWAP STATE AND NEXTSTATE ?
-            next_state, state, action, reward, non_terminal, step_index = batches_of_sequences
+            state, next_state, action, reward, non_terminal, step_index = batches_of_sequences
 
             with tf.GradientTape() as tape:
                 encoded_state = tf.reshape(world_model.encoder(tf.reshape(state, (-1, *image_shape))), (batch_size, sequence_length, -1))

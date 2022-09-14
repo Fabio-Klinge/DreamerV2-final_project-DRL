@@ -52,11 +52,12 @@ class Agent:
         for step in range(steps):
 
             # Obtain action and embedded environment state
-            # action, posterior_rssm_state = self.act(state, previous_action, done, previous_rssm_state)
-            # next_state, reward, done, _ = self.env.step(action.numpy().item())
+            action, posterior_rssm_state = self.act(state, previous_action, done, previous_rssm_state)
+            next_state, reward, done, _ = self.env.step(action.numpy().item())
 
-            action = self.env.action_space.sample()
-            next_state, reward, done, _ = self.env.step(action)
+            # Random Action Selection
+            # action = self.env.action_space.sample()
+            # next_state, reward, done, _ = self.env.step(action)
 
             scores[episode].append(reward)
 
@@ -68,7 +69,7 @@ class Agent:
             state = next_state
             previous_action = action
             sequence_step += 1
-            # previous_rssm_state = posterior_rssm_state
+            previous_rssm_state = posterior_rssm_state
 
             # Terminal state
             if done:

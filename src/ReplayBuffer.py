@@ -6,7 +6,6 @@ from Parameters import *
 
 
 class Buffer:
-    # TODO Changed Buffer Size to 100000 from 1000000
 
     def __init__(
             self,
