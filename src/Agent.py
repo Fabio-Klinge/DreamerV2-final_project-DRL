@@ -1,6 +1,7 @@
 import sys
 
 import gym
+import highway_env # IMPORTANT - it is used, despite the IDE saying otherwise
 import tensorflow as tf
 import tensorflow_probability as tfp
 
