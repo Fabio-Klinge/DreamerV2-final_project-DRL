@@ -6,13 +6,21 @@ import tensorflow_probability as tfp
 import wandb
 from Parameters import *
 from RSSM import RSSMState
+from WorldModel import WorldModel
 
 
 class Trainer:
     def __init__(self):
         super(Trainer, self).__init__()
 
-    def train_batch(self, dataset: tf.data.Dataset, world_model):
+    def train_batch(self, dataset: tf.data.Dataset, world_model: WorldModel):
+        """
+        Trains the whole DreamerV2 on a batch of data. This includes training the RSSM, Reward-, Image- and Discount predictor.
+        :param dataset: Tensorflow Dataset to train on
+        :param world_model: World model object containing RSSM, Reward-, Image- and Discount predictor
+        :return:
+        """
+        # Get all the trainable variables of the world model (and so also RSSM)
         combined_trainable_variables = reduce(add, [model.trainable_variables for model in (world_model.models + world_model.rssm.models)])
 
         for step, data in enumerate(dataset):
@@ -41,20 +49,24 @@ class Trainer:
 
                 loss = image_log_loss + reward_log_loss + 5.0 * discount_log_loss + 0.1 * kl_loss
 
+            # Dream image and log it to wandb, as well as the real counterpart
             predicted_state = wandb.Image((decoder_distribution.sample(1)[0][0] + 1) * 128)
             real_state = wandb.Image((state[0][0] + 1) * 128)
             wandb.log({"predicted_state": predicted_state, "real_state": real_state})
 
+            # Log and print the world model losses to wandb
             print(f"Local Step {step}: Image Log Loss: {image_log_loss} Reward Log Loss: {reward_log_loss} Discount Log Loss {discount_log_loss} KL Loss {kl_loss}")
             wandb.log({"Image Log Loss": image_log_loss, "Reward Log Loss": reward_log_loss, "Discount Log Loss": discount_log_loss, "KL Loss": kl_loss, "Loss": loss})
 
+            # Calculate and apply gradients to world model
             gradients = tape.gradient(loss, combined_trainable_variables)
-
             optimizer_world_model.apply_gradients(zip(gradients, combined_trainable_variables))
 
+            # Actor Critic Training Part
             with tf.GradientTape() as tape1, tf.GradientTape() as tape2:
                 actor_loss, critic_loss = world_model.compute_actor_critic_loss(posterior_rssm_states)
 
+            # Log and print the A2C losses to wandb
             print(f"Local Step {step}: Actor Loss: {actor_loss} Critic Loss: {critic_loss}")
             wandb.log({"Actor Loss": actor_loss, "Critic Loss": critic_loss})
 

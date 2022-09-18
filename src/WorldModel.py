@@ -7,8 +7,6 @@ from Utils import OneHotDist
 
 
 class WorldModel:
-
-
     def __init__(self) -> None:
         super().__init__()
 
@@ -26,7 +24,6 @@ class WorldModel:
                        self.decoder,
                        self.reward_model,
                        self.discount_model)
-
 
     def create_encoder(self, input_size: tuple = image_shape, output_size: int = encoding_size):
         """ Create the encoder model. 
@@ -49,7 +46,6 @@ class WorldModel:
         encoder = tf.keras.Model(encoder_input, encoder_output, name="Encoder")
 
         return encoder
-
 
     def create_decoder(
             self,
@@ -80,12 +76,11 @@ class WorldModel:
 
         return decoder
 
-
     def create_reward_predictor(
             self,
             input_size: tuple = hidden_unit_size + stochastic_state_size,
             output_size: int = 1
-    ):  
+    ):
         """
         Create the reward predictor model.  
         
@@ -108,7 +103,6 @@ class WorldModel:
         return reward_predictor
 
         # Input: concatenation of h and z
-
 
     # Output: float predicting the obtained reward
     def create_discount_predictor(
@@ -139,7 +133,6 @@ class WorldModel:
 
         return discount_predictor
 
-
     def create_actor(
             self,
             input_size: tuple = hidden_unit_size + stochastic_state_size,
@@ -166,7 +159,6 @@ class WorldModel:
 
         return actor
 
-
     def create_critic(
             self,
             input_size: tuple = hidden_unit_size + stochastic_state_size,
@@ -192,7 +184,6 @@ class WorldModel:
         )
 
         return actor
-
 
     def compute_actor_critic_loss(self, posterior_rssm_state: RSSMState):
         """
@@ -233,10 +224,9 @@ class WorldModel:
 
         return actor_loss, critic_loss
 
-
-    def actor_loss(self, dreamed_reward, dreamed_value, dreamed_discount, dreamed_log_probabilities, dreamed_policy_entropies, actor_entropy_scale=0.001, lmbda=0.95):
+    def actor_loss(self, dreamed_reward: tf.Tensor, dreamed_value: tf.Tensor, dreamed_discount: tf.Tensor, dreamed_log_probabilities: tf.Tensor, dreamed_policy_entropies: tf.Tensor, actor_entropy_scale: float = 0.001, lmbda: float = 0.95):
         """
-        Computes the actor loss.
+        Computes the actor loss with all the dreamed/predicted values.
         """
         dreamed_reward = tf.reshape(dreamed_reward, (horizon, -1))
         dreamed_value = tf.reshape(dreamed_value, (horizon, -1))
@@ -252,8 +242,7 @@ class WorldModel:
         actor_loss = -tf.math.reduce_sum(tf.math.reduce_mean(discount * (objective + actor_entropy_scale * policy_entropy), axis=1))
         return actor_loss, discount, lambda_returns
 
-
-    def critic_loss(self, dreamed_hidden_state_h_and_stochastic_state_z, discount, lambda_returns):
+    def critic_loss(self, dreamed_hidden_state_h_and_stochastic_state_z: tf.Tensor, discount: tf.Tensor, lambda_returns: tf.Tensor):
         """
         Computes the critic loss
         """
@@ -265,12 +254,11 @@ class WorldModel:
 
         return critic_loss
 
-
-    def compute_return(self, reward,
-                       value,
-                       discount,
-                       bootstrap,
-                       lmbda):
+    def compute_return(self, reward: tf.Tensor,
+                       value: tf.Tensor,
+                       discount: tf.Tensor,
+                       bootstrap: tf.Tensor,
+                       lmbda: float):
         """
         Computes the lambda returns
         """
@@ -287,16 +275,14 @@ class WorldModel:
         returns = tf.reverse(tf.stack(outputs), [0])
         return returns
 
-
-    def set_trainable_models(self, models, trainable: bool):
+    def set_trainable_models(self, models: list, trainable: bool):
         """
-        Set the trainable flag of the given models.
+        Set the trainable flag of the given models. This is useful for setting multiple models to non-trainable
         """
         for model in models:
             model.trainable = trainable
 
-
-    def compute_log_loss(self, distribution, target):
+    def compute_log_loss(self, distribution: tfp.distributions.Distribution, target: tf.Tensor):
         """
         Computes loss for:
         - Image log loss(Output decoder, frame timestep t)
@@ -305,8 +291,7 @@ class WorldModel:
         """
         return -tf.math.reduce_mean(distribution.log_prob(target))
 
-
-    def compute_kl_loss(self, prior_rssm_states, posterior_rssm_states, alpha=0.8):
+    def compute_kl_loss(self, prior_rssm_states: RSSMState, posterior_rssm_states: RSSMState, alpha: float = 0.8):
         """
         Computes the KL loss. Formula is given by the original DreamerV2 paper.
         alpha: weigh between training the prior toward the representations & regularizing

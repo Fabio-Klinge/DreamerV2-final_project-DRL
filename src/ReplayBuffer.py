@@ -85,7 +85,7 @@ class Buffer:
 
     def sample(self):
         '''
-        Obtain dat from replay buffer.
+        Obtain data from replay buffer.
         '''
         data = self.buffer.as_dataset(num_steps=sequence_length, single_deterministic_pass=True)
 

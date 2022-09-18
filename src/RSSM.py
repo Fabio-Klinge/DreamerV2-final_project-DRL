@@ -9,20 +9,20 @@ from Utils import OneHotDist
 
 class RSSMState(NamedTuple):
     """ 
-    Saves state of the RSSM as a named tuple.
+    Saves important data of the RSSM as a named tuple.
     """
     logits: tf.Tensor = tf.zeros(shape=(stochastic_state_size,))
     stochastic_state_z: tf.Tensor = tf.zeros(shape=(stochastic_state_size,))
     hidden_rnn_state_h: tf.Tensor = tf.zeros(shape=(hidden_unit_size,))
 
     @classmethod
-    def from_list(cls, rssm_states):
+    def from_list(cls, rssm_states: list):
         """
-        Creates a list of RSSMState objects from a list of lists.
+        Creates a single RSSMState ofa list of RSSMState objects
         
         :param cls: RSSMState object
-        :param rssm_states: list of lists
-        :return: list of RSSMState objects
+        :param rssm_states: list of RSSMState objects
+        :return: RSSMState object
         """
         logits = tf.stack([rssm_state.logits for rssm_state in rssm_states], axis=1)
         stochastic_state_z = tf.stack([rssm_state.stochastic_state_z for rssm_state in rssm_states], axis=1)
@@ -31,6 +31,10 @@ class RSSMState(NamedTuple):
         return cls(logits, stochastic_state_z, hidden_rnn_state)
 
     def get_stochastic_state_z_and_hidden_state_h(self):
+        """
+        Concatenates the stochastic state z and the hidden state h.
+        :return: Concatenated tensor of z and h
+        """
         stochastic_state_z_and_hidden_state_h = tf.concat([self.stochastic_state_z, self.hidden_rnn_state_h], axis=-1)
         return stochastic_state_z_and_hidden_state_h
 
@@ -39,14 +43,19 @@ class RSSMState(NamedTuple):
         """ 
         Stop gradients from flowing through the RSSMState object.  
 
-        :param cls: RSSMState object
-        :param rssm_state: list of lists
-        :return: RSSMState object Without gradients
+        :param rssm_state: RSSMState object
+        :return: RSSMState object without stopped gradients
         """
         return cls(tf.stop_gradient(rssm_state.logits), tf.stop_gradient(rssm_state.stochastic_state_z), tf.stop_gradient(rssm_state.hidden_rnn_state_h))
 
     @classmethod
-    def convert_sequences_to_batches(cls, rssm_state, sequence_length):
+    def convert_sequences_to_batches(cls, rssm_state, sequence_length: int):
+        """
+        Converts a sequence of RSSMState objects to a batch of RSSMState objects.
+        :param rssm_state: RSSMState object
+        :param sequence_length: Length of the sequence
+        :return: RSSMState object
+        """
         logits = cls.convert_sequence_to_batch(rssm_state.logits[:sequence_length])
         stochastic_state_z = cls.convert_sequence_to_batch(rssm_state.stochastic_state_z[:sequence_length])
         hidden_rnn_state = cls.convert_sequence_to_batch(rssm_state.hidden_rnn_state_h[:sequence_length])
@@ -54,7 +63,12 @@ class RSSMState(NamedTuple):
         return cls(logits, stochastic_state_z, hidden_rnn_state)
 
     @classmethod
-    def convert_sequence_to_batch(cls, sequence):
+    def convert_sequence_to_batch(cls, sequence: tf.Tensor):
+        """
+        Converts a sequence of tensors to a batch of tensors.
+        :param sequence:
+        :return:
+        """
         batch = tf.reshape(sequence, (sequence.shape[0] * sequence.shape[1], *sequence.shape[2:]))
         return batch
 
@@ -187,7 +201,7 @@ class RSSM:
 
         return create_posterior_stochastic_state_embedder
 
-    def sample_stochastic_state(self, logits):
+    def sample_stochastic_state(self, logits: tf.Tensor):
         """
         Uses probabilities for each element of class in each category of z or z^ (unflattend) to create
             a One Hot Categorical distribution. Then samples from the distribution.

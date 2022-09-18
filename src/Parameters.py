@@ -1,5 +1,6 @@
 import tensorflow as tf
 
+# Image size
 image_shape = (128, 32, 1)
 buffer_length = 100000
 
@@ -24,12 +25,13 @@ target_update_every = 5
 save_models_every = 10
 continue_training_from_latest_checkpoint = False
 logging_weights = False
-use_wandb = True
+use_wandb = True  # Disable this, if you don't have and want a wandb account
 
 optimizer_world_model = tf.keras.optimizers.Adam(0.002, clipnorm=100.0, epsilon=1e-05)
 optimizer_actor = tf.keras.optimizers.Adam(4e-5, clipnorm=100.0)
 optimizer_critic = tf.keras.optimizers.Adam(1e-4, clipnorm=100.0)
 
+# Config for Highway-Env
 env_config = {
     "observation": {
         "type": "GrayscaleObservation",
