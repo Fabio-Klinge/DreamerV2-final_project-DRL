@@ -8,12 +8,22 @@ from Utils import OneHotDist
 
 
 class RSSMState(NamedTuple):
+    """ 
+    Saves state of the RSSM as a named tuple.
+    """
     logits: tf.Tensor = tf.zeros(shape=(stochastic_state_size,))
     stochastic_state_z: tf.Tensor = tf.zeros(shape=(stochastic_state_size,))
     hidden_rnn_state_h: tf.Tensor = tf.zeros(shape=(hidden_unit_size,))
 
     @classmethod
     def from_list(cls, rssm_states):
+        """
+        Creates a list of RSSMState objects from a list of lists.
+        
+        :param cls: RSSMState object
+        :param rssm_states: list of lists
+        :return: list of RSSMState objects
+        """
         logits = tf.stack([rssm_state.logits for rssm_state in rssm_states], axis=1)
         stochastic_state_z = tf.stack([rssm_state.stochastic_state_z for rssm_state in rssm_states], axis=1)
         hidden_rnn_state = tf.stack([rssm_state.hidden_rnn_state_h for rssm_state in rssm_states], axis=1)
@@ -26,6 +36,13 @@ class RSSMState(NamedTuple):
 
     @classmethod
     def detach(cls, rssm_state):
+        """ 
+        Stop gradients from flowing through the RSSMState object.  
+
+        :param cls: RSSMState object
+        :param rssm_state: list of lists
+        :return: RSSMState object Without gradients
+        """
         return cls(tf.stop_gradient(rssm_state.logits), tf.stop_gradient(rssm_state.stochastic_state_z), tf.stop_gradient(rssm_state.hidden_rnn_state_h))
 
     @classmethod
@@ -256,9 +273,13 @@ class RSSM:
 
     def observe(self, encoded_state: tf.Tensor, previous_action: tf.Tensor, previous_non_terminal: tf.Tensor, previous_rssm_state: RSSMState):
         """
-        Creates a dreamed categorical representation z^ by feeding the previous z or z^, action and flipped terminal to the model. 
+        Creates a dreamed categorical representation z^ by feeding the previous z and z^, action and flipped terminal to the model. 
 
-        Creates Z' and Z
+        :param: encoded_state: encoded state from encoder
+        :param: previous_action: action taken in previous step
+        :param: previous_non_terminal: output of terminal network from prior step (flipped)
+        :param: previous_rssm_state: RSSMState object containing previous z and z^
+        :returns: categorical representation z and z^
         """
         # Obtain Z^
         prior_rssm_state = self.dream(previous_rssm_state, previous_action, previous_non_terminal)
@@ -277,12 +298,13 @@ class RSSM:
 
     def observing_rollout(self, encoded_states: tf.Tensor, actions: tf.Tensor, non_terminals: tf.Tensor, previous_rssm_state: RSSMState):
         """
-
-        :param encoded_states:
-        :param actions:
-        :param non_terminals:
-        :param previous_rssm_state:
-        :return:
+        Output a rollout of z and z^ of length horizon as "observation" for the actor model.
+        
+        :param: encoded_states: encoded states from encoder
+        :param: actions: actions taken in previous step
+        :param: non_terminals: output of terminal network from prior step (flipped)
+        :param: previous_rssm_state: RSSMState object containing previous z and z^
+        :returns: rollout of z and z^
         """
         prior_rssm_states = []
         posterior_rssm_states = []

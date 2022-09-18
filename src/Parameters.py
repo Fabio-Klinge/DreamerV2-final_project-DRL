@@ -1,6 +1,5 @@
 import tensorflow as tf
 
-# Image size
 image_shape = (128, 32, 1)
 buffer_length = 100000
 

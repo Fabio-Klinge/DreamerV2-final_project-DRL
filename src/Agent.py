@@ -127,6 +127,8 @@ class Agent:
 
     def act(self, state, previous_action, non_terminal, previous_rssm_state: RSSMState):
         '''
+        Take ation in a state and obtain new action and posterior rssm state.
+
         :params: state: Current state s
         :params: previous_action: action taken in s
         :params: non_terminal: Flipped terminal Boolean

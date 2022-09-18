@@ -84,6 +84,9 @@ class Buffer:
         self.buffer.add_batch(batched_values)
 
     def sample(self):
+        '''
+        Obtain dat from replay buffer.
+        '''
         data = self.buffer.as_dataset(num_steps=sequence_length, single_deterministic_pass=True)
 
         data = data.map(lambda buffer_content, _: (((buffer_content[0] / 128.) - 1, (buffer_content[1] / 128.) - 1, buffer_content[2], buffer_content[3], buffer_content[4], buffer_content[5]), _))

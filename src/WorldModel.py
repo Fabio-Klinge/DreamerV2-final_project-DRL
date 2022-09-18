@@ -8,6 +8,7 @@ from Utils import OneHotDist
 
 class WorldModel:
 
+
     def __init__(self) -> None:
         super().__init__()
 
@@ -26,7 +27,15 @@ class WorldModel:
                        self.reward_model,
                        self.discount_model)
 
+
     def create_encoder(self, input_size: tuple = image_shape, output_size: int = encoding_size):
+        """ Create the encoder model. 
+        
+        :params: input_size: shape of the frame from environment
+        :params: output_size: size of the encoding  
+        :returns: encoder model
+        """
+
         encoder_input = tf.keras.Input(shape=input_size)
         x = Conv2D(32, (3, 3), activation="elu", padding="same")(encoder_input)
         x = MaxPooling2D((2, 2), padding="same")(x)
@@ -41,14 +50,19 @@ class WorldModel:
 
         return encoder
 
-    # Input size = 1024(z:32x32) + 200(size of hidden state)
-    # Output size = game frame
+
     def create_decoder(
             self,
             input_size: tuple = stochastic_state_size + hidden_unit_size,
             output_size: tuple = image_shape
     ):
-        # Third dimension might be obsolete
+        """ 
+        Create the decoder model.
+
+        :params: input_size: size of the categorical representations concatenated with the hidden state size
+        :params: output_size: size of an image from the environment 
+        :returns: decoder model
+        """
         decoder_input = tf.keras.Input(shape=input_size)
         x = Dense(1024, activation="elu")(decoder_input)
         x = Reshape((8, 2, 64))(x)
@@ -56,12 +70,7 @@ class WorldModel:
         x = Conv2DTranspose(16, (3, 3), strides=2, activation="elu", padding="same")(x)
         x = Conv2DTranspose(8, (3, 3), strides=2, activation="elu", padding="same")(x)
         x = Conv2DTranspose(8, (3, 3), strides=2, activation="elu", padding="same")(x)
-        # x = BatchNormalization()(x)
         x = Conv2D(1, (3, 3), strides=1, activation="linear", padding="same")(x)
-
-        # x = Flatten()(x)
-
-        # decoder_output = tfp.layers.IndependentNormal(event_shape=output_size)(x)
 
         decoder = tf.keras.Model(
             decoder_input,
@@ -71,22 +80,24 @@ class WorldModel:
 
         return decoder
 
-        # Input: concatenation of h and z
 
-    # Output: float predicting the obtained reward
     def create_reward_predictor(
             self,
             input_size: tuple = hidden_unit_size + stochastic_state_size,
             output_size: int = 1
-    ):
+    ):  
+        """
+        Create the reward predictor model.  
+        
+        :params: input_size: size of the concatenation of the hidden state and the categorical representation
+        :params: output_size: size of the predicted reward
+        :returns: reward predictor model
+        """
         reward_predictor_input = tf.keras.Input(shape=input_size)
         x = Dense(mlp_hidden_layer_size, activation="elu")(reward_predictor_input)
         x = Dense(mlp_hidden_layer_size, activation="elu")(x)
         x = Dense(mlp_hidden_layer_size, activation="elu")(x)
         x = Dense(output_size)(x)
-        # Creates independent normal distribution
-        # Hope is that it learns to output variables over reward space [0,1]
-        # reward_predictor_output = tfp.layers.IndependentNormal()(x)
 
         reward_predictor = tf.keras.Model(
             reward_predictor_input,
@@ -98,12 +109,20 @@ class WorldModel:
 
         # Input: concatenation of h and z
 
+
     # Output: float predicting the obtained reward
     def create_discount_predictor(
             self,
             input_size: tuple = hidden_unit_size + stochastic_state_size,
             output_size: int = 1
     ):
+        """
+        Create the discount predictor model.
+
+        :params: input_size: size of the concatenation of the hidden state and the categorical representation
+        :params: output_size: size of the predicted discount factor 
+        :returns: discount predictor model
+        """
         discount_predictor_input = tf.keras.Input(shape=input_size)
         x = Dense(mlp_hidden_layer_size, activation="elu")(discount_predictor_input)
         x = Dense(mlp_hidden_layer_size, activation="elu")(x)
@@ -120,11 +139,19 @@ class WorldModel:
 
         return discount_predictor
 
+
     def create_actor(
             self,
             input_size: tuple = hidden_unit_size + stochastic_state_size,
             output_size: int = action_space_size
     ):
+        """
+        Create the actor model.
+
+        :params: input_size: size of the concatenation of the hidden state and the categorical representation
+        :params: output_size: size of the action space  
+        :returns: actor model
+        """
         actor_input = tf.keras.Input(shape=input_size)
         x = Dense(mlp_hidden_layer_size, activation="elu")(actor_input)
         x = Dense(mlp_hidden_layer_size, activation="elu")(x)
@@ -139,11 +166,19 @@ class WorldModel:
 
         return actor
 
+
     def create_critic(
             self,
             input_size: tuple = hidden_unit_size + stochastic_state_size,
             output_size: int = 1
     ):
+        """
+        Create the critic model.
+
+        :params: input_size: size of the concatenation of the hidden state and the categorical representation.
+        :params: output_size: size of the predicted value for the state action pair embedded in the concatenation   
+        :returns: critic model
+        """
         critic_input = tf.keras.Input(shape=input_size)
         x = Dense(mlp_hidden_layer_size, activation="elu")(critic_input)
         x = Dense(mlp_hidden_layer_size, activation="elu")(x)
@@ -158,16 +193,20 @@ class WorldModel:
 
         return actor
 
+
     def compute_actor_critic_loss(self, posterior_rssm_state: RSSMState):
         """
         Computes the loss for the actor and critic networks using the posterior state z.
+
+        :params: posterior_rssm_state: posterior state of the RSSM(z) created from the RSSM and the image from the environment
+        :returns: actor and critic loss
         """
 
         batched_posterior_rssm_states = RSSMState.detach(RSSMState.convert_sequences_to_batches(posterior_rssm_state, sequence_length=sequence_length - 1))
 
         dreamed_rssm_states, dreamed_log_probabilities, dreamed_policy_entropies = self.rssm.dreaming_rollout(horizon, self.actor, batched_posterior_rssm_states)
-        dreamed_log_probabilities = tf.reshape(dreamed_log_probabilities, [horizon, -1])  # batch_size * (sequence_length - 1)])
-        dreamed_policy_entropies = tf.reshape(dreamed_policy_entropies, [horizon, -1])  # batch_size * (sequence_length - 1) ])
+        dreamed_log_probabilities = tf.reshape(dreamed_log_probabilities, [horizon, -1])
+        dreamed_policy_entropies = tf.reshape(dreamed_policy_entropies, [horizon, -1])
 
         dreamed_hidden_state_h_and_stochastic_state_z = dreamed_rssm_states.get_stochastic_state_z_and_hidden_state_h()
 
@@ -194,9 +233,10 @@ class WorldModel:
 
         return actor_loss, critic_loss
 
+
     def actor_loss(self, dreamed_reward, dreamed_value, dreamed_discount, dreamed_log_probabilities, dreamed_policy_entropies, actor_entropy_scale=0.001, lmbda=0.95):
         """
-        Computes the actor loss
+        Computes the actor loss.
         """
         dreamed_reward = tf.reshape(dreamed_reward, (horizon, -1))
         dreamed_value = tf.reshape(dreamed_value, (horizon, -1))
@@ -212,19 +252,19 @@ class WorldModel:
         actor_loss = -tf.math.reduce_sum(tf.math.reduce_mean(discount * (objective + actor_entropy_scale * policy_entropy), axis=1))
         return actor_loss, discount, lambda_returns
 
+
     def critic_loss(self, dreamed_hidden_state_h_and_stochastic_state_z, discount, lambda_returns):
         """
         Computes the critic loss
         """
-        # TODO Why do we need sometimes -1 and sometimes not?!
-        dreamed_hidden_state_h_and_stochastic_state_z = tf.reshape(dreamed_hidden_state_h_and_stochastic_state_z, (horizon, -1, hidden_unit_size + stochastic_state_size))  # batch_size * (sequence_length - 1), -1))
+        dreamed_hidden_state_h_and_stochastic_state_z = tf.reshape(dreamed_hidden_state_h_and_stochastic_state_z, (horizon, -1, hidden_unit_size + stochastic_state_size))
         critic_logits = self.critic(tf.stop_gradient(tf.reshape(dreamed_hidden_state_h_and_stochastic_state_z[:-1], (-1, hidden_unit_size + stochastic_state_size))))
-        # TODO Why do we need sometimes -1 and sometimes not?!
-        critic_logits = tf.reshape(critic_logits, (horizon - 1, -1))  # batch_size * (sequence_length - 1)))
+        critic_logits = tf.reshape(critic_logits, (horizon - 1, -1))
         critic_distribution = tfp.distributions.Independent(tfp.distributions.Normal(critic_logits, 1))
         critic_loss = -tf.reduce_mean(tf.stop_gradient(tf.reshape(discount, (horizon - 1, -1))) * tf.expand_dims(critic_distribution.log_prob(tf.stop_gradient(lambda_returns)), -1))
 
         return critic_loss
+
 
     def compute_return(self, reward,
                        value,
@@ -247,12 +287,14 @@ class WorldModel:
         returns = tf.reverse(tf.stack(outputs), [0])
         return returns
 
+
     def set_trainable_models(self, models, trainable: bool):
         """
         Set the trainable flag of the given models.
         """
         for model in models:
             model.trainable = trainable
+
 
     def compute_log_loss(self, distribution, target):
         """
@@ -262,6 +304,7 @@ class WorldModel:
         - Discount log loss(Output of discount network, terminal state timestep t)
         """
         return -tf.math.reduce_mean(distribution.log_prob(target))
+
 
     def compute_kl_loss(self, prior_rssm_states, posterior_rssm_states, alpha=0.8):
         """
